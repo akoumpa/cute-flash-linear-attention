@@ -8,9 +8,11 @@
 """Utils op backends."""
 
 from fla.ops.backends import BackendRegistry, dispatch
+from fla.ops.utils.backends.cute import CuteUtilsBackend
 from fla.ops.utils.backends.triton_ascend import TritonAscendUtilsBackend
 
-utils_registry = BackendRegistry('utils')
+utils_registry = BackendRegistry("utils")
 utils_registry.register(TritonAscendUtilsBackend())
+utils_registry.register(CuteUtilsBackend())
 
-__all__ = ['dispatch', 'utils_registry']
+__all__ = ["dispatch", "utils_registry"]

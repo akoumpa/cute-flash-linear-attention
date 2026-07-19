@@ -239,7 +239,8 @@ def _shared_internals(repo_root: Path, test_files: list[Path]) -> list[dict[str,
                 if namespace not in candidate.relative_to(ops_root).parts[:1]
                 and f"from {module} import" in candidate.read_text(errors="ignore")
             )
-            cute_files = _native_cute_files(repo_root, module_stem=path.stem)
+            is_platform_backend = "backends" in path.relative_to(ops_root).parts
+            cute_files = [] if is_platform_backend else _native_cute_files(repo_root, module_stem=path.stem)
             records.append(
                 {
                     "id": module.removeprefix("fla.ops."),
