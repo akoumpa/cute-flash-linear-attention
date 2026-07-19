@@ -31,25 +31,52 @@ from fla.ops.utils.op import exp
 from fla.utils import autotune_cache_kwargs, input_guard
 
 
+def _can_use_cute_hgrn(x, g, initial_state):
+    if (
+        not x.is_cuda
+        or x.dtype not in (torch.float16, torch.bfloat16, torch.float32)
+        or x.ndim != 3
+        or x.shape != g.shape
+        or x.dtype != g.dtype
+        or x.device != g.device
+        or not x.is_contiguous()
+        or not g.is_contiguous()
+    ):
+        return False
+    B, T, D = x.shape
+    if B < 1 or T < 1 or T > 128 or D < 1 or B * D < 256:
+        return False
+    if initial_state is not None and (
+        initial_state.shape != (B, D)
+        or initial_state.dtype != x.dtype
+        or initial_state.device != x.device
+        or not initial_state.is_contiguous()
+    ):
+        return False
+    from fla.ops.backends.cute.runtime import is_cute_dsl_available
+
+    return is_cute_dsl_available()
+
+
 @triton.autotune(
     configs=[
-        triton.Config({'BD': 32}, num_warps=1),
-        triton.Config({'BD': 32}, num_warps=2),
-        triton.Config({'BD': 32}, num_warps=4),
-        triton.Config({'BD': 32}, num_warps=8),
-        triton.Config({'BD': 64}, num_warps=1),
-        triton.Config({'BD': 64}, num_warps=2),
-        triton.Config({'BD': 64}, num_warps=4),
-        triton.Config({'BD': 64}, num_warps=8),
-        triton.Config({'BD': 128}, num_warps=1),
-        triton.Config({'BD': 128}, num_warps=2),
-        triton.Config({'BD': 128}, num_warps=4),
-        triton.Config({'BD': 128}, num_warps=8),
+        triton.Config({"BD": 32}, num_warps=1),
+        triton.Config({"BD": 32}, num_warps=2),
+        triton.Config({"BD": 32}, num_warps=4),
+        triton.Config({"BD": 32}, num_warps=8),
+        triton.Config({"BD": 64}, num_warps=1),
+        triton.Config({"BD": 64}, num_warps=2),
+        triton.Config({"BD": 64}, num_warps=4),
+        triton.Config({"BD": 64}, num_warps=8),
+        triton.Config({"BD": 128}, num_warps=1),
+        triton.Config({"BD": 128}, num_warps=2),
+        triton.Config({"BD": 128}, num_warps=4),
+        triton.Config({"BD": 128}, num_warps=8),
     ],
-    key=['D'],
+    key=["D"],
     **autotune_cache_kwargs,
 )
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=["T"])
 def chunk_hgrn_fwd_kernel_h(
     x,
     g,
@@ -91,7 +118,7 @@ def chunk_hgrn_fwd_kernel_h(
         p_o += D
 
 
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=["T"])
 def chunk_hgrn_fwd_kernel_o(
     gc,
     o,
@@ -121,15 +148,11 @@ def chunk_hgrn_fwd_kernel_o(
 
 
 @triton.autotune(
-    configs=[
-        triton.Config({'BD': BD}, num_warps=num_warps)
-        for BD in [32, 64, 128]
-        for num_warps in [1, 2, 4, 8]
-    ],
-    key=['D'],
+    configs=[triton.Config({"BD": BD}, num_warps=num_warps) for BD in [32, 64, 128] for num_warps in [1, 2, 4, 8]],
+    key=["D"],
     **autotune_cache_kwargs,
 )
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=["T"])
 def chunk_hgrn_bwd_kernel_h(
     g,
     gc,
@@ -175,7 +198,7 @@ def chunk_hgrn_bwd_kernel_h(
         p_do -= D
 
 
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=["T"])
 def chunk_hgrn_bwd_kernel_o(
     g,
     gc,
@@ -217,7 +240,6 @@ def chunk_hgrn_bwd_kernel_o(
 
 
 class ChunkHGRNFunction(torch.autograd.Function):
-
     @staticmethod
     @input_guard
     def forward(ctx, x, g, initial_state=None, output_final_state=False):
@@ -225,26 +247,49 @@ class ChunkHGRNFunction(torch.autograd.Function):
         BT, BD = 128, min(64, triton.next_power_of_2(D))
         num_warps = 8 if BD == 64 else 4
 
-        gc = torch.empty_like(g, dtype=torch.float)
-        o = torch.empty_like(x, dtype=torch.float)
-        def grid(meta): return (triton.cdiv(D, meta['BD']), triton.cdiv(T, meta['BT']), B)
-        chunk_hgrn_fwd_kernel_h[grid](
-            x, g, gc, o, initial_state,
-            T=T, D=D, BT=BT,
-            USE_INITIAL_STATE=initial_state is not None,
-        )
-        def grid(meta): return (triton.cdiv(D, meta['BD']), B)
-        chunk_hgrn_fwd_kernel_o[grid](
-            gc, o,
-            o.stride(-3), o.stride(-2), o.stride(-1),
-            T=T, D=D, BT=BT, BD=BD,
-            num_warps=num_warps,
-        )
-        final_state = None
-        if output_final_state:
-            final_state = o[:, -1].clone()
+        use_cute = _can_use_cute_hgrn(x, g, initial_state)
+        if use_cute:
+            from fla.ops.backends.cute.hgrn import hgrn_fwd_cute
+
+            o, final_state = hgrn_fwd_cute(x, g, initial_state, output_final_state)
+        else:
+            gc = torch.empty_like(g, dtype=torch.float)
+            o = torch.empty_like(x, dtype=torch.float)
+
+            def grid(meta):
+                return (triton.cdiv(D, meta["BD"]), triton.cdiv(T, meta["BT"]), B)
+
+            chunk_hgrn_fwd_kernel_h[grid](
+                x,
+                g,
+                gc,
+                o,
+                initial_state,
+                T=T,
+                D=D,
+                BT=BT,
+                USE_INITIAL_STATE=initial_state is not None,
+            )
+
+            def grid(meta):
+                return (triton.cdiv(D, meta["BD"]), B)
+
+            chunk_hgrn_fwd_kernel_o[grid](
+                gc,
+                o,
+                o.stride(-3),
+                o.stride(-2),
+                o.stride(-1),
+                T=T,
+                D=D,
+                BT=BT,
+                BD=BD,
+                num_warps=num_warps,
+            )
+            final_state = o[:, -1].clone() if output_final_state else None
         o = o.to(x.dtype)
         ctx.save_for_backward(g, o, initial_state)
+        ctx.use_cute = use_cute
         return o, final_state
 
     @staticmethod
@@ -255,24 +300,49 @@ class ChunkHGRNFunction(torch.autograd.Function):
         BT, BD = 128, min(64, triton.next_power_of_2(D))
         num_warps = 8 if BD == 64 else 4
 
-        gc = torch.empty_like(g, dtype=torch.float)
-        dx = torch.empty_like(o, dtype=torch.float)
-        def grid(meta): return (triton.cdiv(D, meta['BD']), triton.cdiv(T, meta['BT']), B)
-        chunk_hgrn_bwd_kernel_h[grid](
-            g, gc, dx, do,
-            T=T, D=D, BT=BT,
-        )
+        if ctx.use_cute:
+            from fla.ops.backends.cute.hgrn import hgrn_bwd_cute
 
-        dg = torch.empty_like(g, dtype=torch.float)
-        def grid(meta): return (triton.cdiv(D, meta['BD']), B)
-        chunk_hgrn_bwd_kernel_o[grid](
-            g, gc, o, dx, dg,
-            o.stride(-3), o.stride(-2), o.stride(-1),
-            T=T, D=D, BT=BT, BD=BD,
-            num_warps=num_warps,
-        )
-        if initial_state is not None:
-            dg[:, 0] = (initial_state * dx[:, 0] * g[:, 0].float().exp()).to(dg.dtype)
+            dx, dg = hgrn_bwd_cute(g, o, do, initial_state)
+        else:
+            gc = torch.empty_like(g, dtype=torch.float)
+            dx = torch.empty_like(o, dtype=torch.float)
+
+            def grid(meta):
+                return (triton.cdiv(D, meta["BD"]), triton.cdiv(T, meta["BT"]), B)
+
+            chunk_hgrn_bwd_kernel_h[grid](
+                g,
+                gc,
+                dx,
+                do,
+                T=T,
+                D=D,
+                BT=BT,
+            )
+
+            dg = torch.empty_like(g, dtype=torch.float)
+
+            def grid(meta):
+                return (triton.cdiv(D, meta["BD"]), B)
+
+            chunk_hgrn_bwd_kernel_o[grid](
+                g,
+                gc,
+                o,
+                dx,
+                dg,
+                o.stride(-3),
+                o.stride(-2),
+                o.stride(-1),
+                T=T,
+                D=D,
+                BT=BT,
+                BD=BD,
+                num_warps=num_warps,
+            )
+            if initial_state is not None:
+                dg[:, 0] = (initial_state * dx[:, 0] * g[:, 0].float().exp()).to(dg.dtype)
 
         return dx.to(o.dtype), dg, None, None
 
