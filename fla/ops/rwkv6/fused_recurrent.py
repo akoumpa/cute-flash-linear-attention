@@ -13,20 +13,70 @@ from fla.ops.utils.op import exp
 from fla.utils import autocast_custom_bwd, autocast_custom_fwd, autotune_cache_kwargs, input_guard
 
 
-@triton.heuristics({
-    'USE_INITIAL_STATE': lambda args: args['h0'] is not None,
-    'STORE_FINAL_STATE': lambda args: args['ht'] is not None,
-    'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
-})
+def _can_use_cute_rwkv6(q, k, v, w, u, initial_state, reverse, cu_seqlens):
+    if (
+        torch.is_grad_enabled()
+        or reverse
+        or cu_seqlens is not None
+        or not q.is_cuda
+        or q.dtype not in (torch.float16, torch.bfloat16)
+        or q.dtype != k.dtype
+        or q.dtype != v.dtype
+        or q.ndim != 4
+        or k.shape != q.shape
+        or v.ndim != 4
+    ):
+        return False
+    B, T, H, K = q.shape
+    V = v.shape[-1]
+    if (
+        B < 1
+        or not 1 <= T <= 8
+        or H < 1
+        or B * H < 4
+        or K != 32
+        or V != 32
+        or v.shape != (B, T, H, V)
+        or w.shape != q.shape
+        or u.shape != (H, K)
+        or w.dtype not in (torch.float16, torch.bfloat16, torch.float32)
+        or u.dtype not in (torch.float16, torch.bfloat16, torch.float32)
+        or q.device != k.device
+        or q.device != v.device
+        or q.device != w.device
+        or q.device != u.device
+        or not q.is_contiguous()
+        or not k.is_contiguous()
+        or not v.is_contiguous()
+        or not w.is_contiguous()
+        or not u.is_contiguous()
+    ):
+        return False
+    if initial_state is not None and (
+        initial_state.shape != (B, H, K, V)
+        or initial_state.dtype != torch.float32
+        or initial_state.device != q.device
+        or not initial_state.is_contiguous()
+    ):
+        return False
+    from fla.ops.backends.cute.runtime import is_cute_dsl_available
+
+    return is_cute_dsl_available()
+
+
+@triton.heuristics(
+    {
+        "USE_INITIAL_STATE": lambda args: args["h0"] is not None,
+        "STORE_FINAL_STATE": lambda args: args["ht"] is not None,
+        "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
+    }
+)
 @triton.autotune(
-    configs=[
-        triton.Config({}, num_warps=num_warps)
-        for num_warps in [1, 2, 4, 8, 16]
-    ],
-    key=['BK', 'BV'],
+    configs=[triton.Config({}, num_warps=num_warps) for num_warps in [1, 2, 4, 8, 16]],
+    key=["BK", "BV"],
     **autotune_cache_kwargs,
 )
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=["T"])
 def fused_recurrent_rwkv6_fwd_kernel(
     q,  # query [B, H, T, K]/[B, T, H, K]
     k,  # key [B, H, T, K]/[B, T, H, K]
@@ -62,11 +112,11 @@ def fused_recurrent_rwkv6_fwd_kernel(
 
     o_k = i_k * BK + tl.arange(0, BK)
     o_v = i_v * BV + tl.arange(0, BV)
-    p_q = q + (bos + ((T-1) if REVERSE else 0)) * H*K + i_h * K + o_k
-    p_k = k + (bos + ((T-1) if REVERSE else 0)) * H*K + i_h * K + o_k
-    p_v = v + (bos + ((T-1) if REVERSE else 0)) * H*V + i_h * V + o_v
-    p_w = w + (bos + ((T-1) if REVERSE else 0)) * H*K + i_h * K + o_k
-    p_o = o + ((i_k * all + bos) + ((T-1) if REVERSE else 0)) * H*V + i_h * V + o_v
+    p_q = q + (bos + ((T - 1) if REVERSE else 0)) * H * K + i_h * K + o_k
+    p_k = k + (bos + ((T - 1) if REVERSE else 0)) * H * K + i_h * K + o_k
+    p_v = v + (bos + ((T - 1) if REVERSE else 0)) * H * V + i_h * V + o_v
+    p_w = w + (bos + ((T - 1) if REVERSE else 0)) * H * K + i_h * K + o_k
+    p_o = o + ((i_k * all + bos) + ((T - 1) if REVERSE else 0)) * H * V + i_h * V + o_v
     p_u = u + i_h * K + o_k
 
     mask_k = o_k < K
@@ -77,7 +127,7 @@ def fused_recurrent_rwkv6_fwd_kernel(
 
     b_h = tl.zeros([BK, BV], dtype=tl.float32)
     if USE_INITIAL_STATE:
-        p_h0 = h0 + i_nh * K*V + o_k[:, None] * V + o_v[None, :]
+        p_h0 = h0 + i_nh * K * V + o_k[:, None] * V + o_v[None, :]
         b_h += tl.load(p_h0, mask=mask_h, other=0).to(tl.float32)
 
     for _ in range(0, T):
@@ -89,31 +139,33 @@ def fused_recurrent_rwkv6_fwd_kernel(
         b_o = tl.sum((b_h + b_kv * b_u[:, None]) * b_q[:, None], 0)
         b_h = b_h * exp(b_w)[:, None] + b_kv
         tl.store(p_o, b_o.to(p_o.dtype.element_ty), mask=mask_v)
-        p_q += (-1 if REVERSE else 1) * H*K
-        p_k += (-1 if REVERSE else 1) * H*K
-        p_v += (-1 if REVERSE else 1) * H*V
-        p_w += (-1 if REVERSE else 1) * H*K
-        p_o += (-1 if REVERSE else 1) * H*V
+        p_q += (-1 if REVERSE else 1) * H * K
+        p_k += (-1 if REVERSE else 1) * H * K
+        p_v += (-1 if REVERSE else 1) * H * V
+        p_w += (-1 if REVERSE else 1) * H * K
+        p_o += (-1 if REVERSE else 1) * H * V
 
     if STORE_FINAL_STATE:
-        p_ht = ht + i_nh * K*V + o_k[:, None] * V + o_v[None, :]
+        p_ht = ht + i_nh * K * V + o_k[:, None] * V + o_v[None, :]
         tl.store(p_ht, b_h.to(p_ht.dtype.element_ty), mask=mask_h)
 
 
-@triton.heuristics({
-    'USE_INITIAL_STATE': lambda args: args['h0'] is not None,
-    'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
-})
+@triton.heuristics(
+    {
+        "USE_INITIAL_STATE": lambda args: args["h0"] is not None,
+        "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
+    }
+)
 @triton.autotune(
     configs=[
         triton.Config({}, num_warps=1),
         triton.Config({}, num_warps=2),
         triton.Config({}, num_warps=4),
     ],
-    key=['BK', 'BV'],
+    key=["BK", "BV"],
     **autotune_cache_kwargs,
 )
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=["T"])
 def fused_recurrent_rwkv6_bwd_kernel_dq(
     k,  # key [B, H, T, V]/[B, T, H, V]
     v,  # value [B, H, T, V]/[B, T, H, V]
@@ -148,12 +200,12 @@ def fused_recurrent_rwkv6_bwd_kernel_dq(
 
     o_k = i_k * BK + tl.arange(0, BK)
     o_v = i_v * BV + tl.arange(0, BV)
-    p_k = k + (bos + ((T-1) if REVERSE else 0)) * H*K + i_h * K + o_k
-    p_v = v + (bos + ((T-1) if REVERSE else 0)) * H*V + i_h * V + o_v
-    p_w = w + (bos + ((T-1) if REVERSE else 0)) * H*K + i_h * K + o_k
-    p_do = do + (bos + ((T-1) if REVERSE else 0)) * H*V + i_h * V + o_v
-    p_dq = dq + ((i_v * all + bos) + ((T-1) if REVERSE else 0)) * H*K + i_h * K + o_k
-    p_dq1 = dq1 + ((i_v * all + bos) + ((T-1) if REVERSE else 0)) * H*K + i_h * K + o_k
+    p_k = k + (bos + ((T - 1) if REVERSE else 0)) * H * K + i_h * K + o_k
+    p_v = v + (bos + ((T - 1) if REVERSE else 0)) * H * V + i_h * V + o_v
+    p_w = w + (bos + ((T - 1) if REVERSE else 0)) * H * K + i_h * K + o_k
+    p_do = do + (bos + ((T - 1) if REVERSE else 0)) * H * V + i_h * V + o_v
+    p_dq = dq + ((i_v * all + bos) + ((T - 1) if REVERSE else 0)) * H * K + i_h * K + o_k
+    p_dq1 = dq1 + ((i_v * all + bos) + ((T - 1) if REVERSE else 0)) * H * K + i_h * K + o_k
     p_u = u + i_h * K + o_k
 
     mask_k = o_k < K
@@ -164,7 +216,7 @@ def fused_recurrent_rwkv6_bwd_kernel_dq(
 
     b_h = tl.zeros([BK, BV], dtype=tl.float32)
     if USE_INITIAL_STATE:
-        p_h0 = h0 + i_nh * K*V + o_k[:, None] * V + o_v[None, :]
+        p_h0 = h0 + i_nh * K * V + o_k[:, None] * V + o_v[None, :]
         b_h += tl.load(p_h0, mask=mask_h, other=0).to(tl.float32)
 
     for _ in range(0, T):
@@ -182,28 +234,30 @@ def fused_recurrent_rwkv6_bwd_kernel_dq(
         tl.store(p_dq, b_dq.to(p_dq.dtype.element_ty), mask=mask_k)
         tl.store(p_dq1, b_dq1.to(p_dq1.dtype.element_ty), mask=mask_k)
 
-        p_k += (-1 if REVERSE else 1) * H*K
-        p_v += (-1 if REVERSE else 1) * H*V
-        p_w += (-1 if REVERSE else 1) * H*K
-        p_do += (-1 if REVERSE else 1) * H*V
-        p_dq += (-1 if REVERSE else 1) * H*K
-        p_dq1 += (-1 if REVERSE else 1) * H*K
+        p_k += (-1 if REVERSE else 1) * H * K
+        p_v += (-1 if REVERSE else 1) * H * V
+        p_w += (-1 if REVERSE else 1) * H * K
+        p_do += (-1 if REVERSE else 1) * H * V
+        p_dq += (-1 if REVERSE else 1) * H * K
+        p_dq1 += (-1 if REVERSE else 1) * H * K
 
 
-@triton.heuristics({
-    'USE_INITIAL_STATE': lambda args: args['dh0'] is not None,
-    'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
-})
+@triton.heuristics(
+    {
+        "USE_INITIAL_STATE": lambda args: args["dh0"] is not None,
+        "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
+    }
+)
 @triton.autotune(
     configs=[
         triton.Config({}, num_warps=1),
         triton.Config({}, num_warps=2),
         triton.Config({}, num_warps=4),
     ],
-    key=['BK', 'BV'],
+    key=["BK", "BV"],
     **autotune_cache_kwargs,
 )
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=["T"])
 def fused_recurrent_rwkv6_bwd_kernel_dkv(
     q,  # query [B, H, T, K]/[B, T, H, K]
     k,  # key [B, H, T, V]/[B, T, H, V]
@@ -240,14 +294,14 @@ def fused_recurrent_rwkv6_bwd_kernel_dkv(
 
     o_k = i_k * BK + tl.arange(0, BK)
     o_v = i_v * BV + tl.arange(0, BV)
-    p_q = q + (bos + ((T-1) if not REVERSE else 0)) * H*K + i_h * K + o_k
-    p_k = k + (bos + ((T-1) if not REVERSE else 0)) * H*K + i_h * K + o_k
-    p_v = v + (bos + ((T-1) if not REVERSE else 0)) * H*V + i_h * V + o_v
-    p_w = w + (bos + ((T-1) if not REVERSE else 0)) * H*K + i_h * K + o_k
-    p_do = do + (bos + ((T-1) if not REVERSE else 0)) * H*V + i_h * V + o_v
-    p_dk = dk + ((i_v * all + bos) + ((T-1) if not REVERSE else 0)) * H*K + i_h * K + o_k
-    p_dk1 = dk1 + ((i_v * all + bos) + ((T-1) if not REVERSE else 0)) * H*K + i_h * K + o_k
-    p_dv = dv + ((i_k * all + bos) + ((T-1) if not REVERSE else 0)) * H*V + i_h * V + o_v
+    p_q = q + (bos + ((T - 1) if not REVERSE else 0)) * H * K + i_h * K + o_k
+    p_k = k + (bos + ((T - 1) if not REVERSE else 0)) * H * K + i_h * K + o_k
+    p_v = v + (bos + ((T - 1) if not REVERSE else 0)) * H * V + i_h * V + o_v
+    p_w = w + (bos + ((T - 1) if not REVERSE else 0)) * H * K + i_h * K + o_k
+    p_do = do + (bos + ((T - 1) if not REVERSE else 0)) * H * V + i_h * V + o_v
+    p_dk = dk + ((i_v * all + bos) + ((T - 1) if not REVERSE else 0)) * H * K + i_h * K + o_k
+    p_dk1 = dk1 + ((i_v * all + bos) + ((T - 1) if not REVERSE else 0)) * H * K + i_h * K + o_k
+    p_dv = dv + ((i_k * all + bos) + ((T - 1) if not REVERSE else 0)) * H * V + i_h * V + o_v
     p_u = u + i_h * K + o_k
 
     mask_k = o_k < K
@@ -274,34 +328,36 @@ def fused_recurrent_rwkv6_bwd_kernel_dkv(
         b_dh *= exp(b_w)[:, None]
         b_dh += b_dkv
 
-        p_q += (-1 if not REVERSE else 1) * H*K
-        p_k += (-1 if not REVERSE else 1) * H*K
-        p_v += (-1 if not REVERSE else 1) * H*V
-        p_w += (-1 if not REVERSE else 1) * H*K
-        p_do += (-1 if not REVERSE else 1) * H*V
-        p_dk += (-1 if not REVERSE else 1) * H*K
-        p_dk1 += (-1 if not REVERSE else 1) * H*K
-        p_dv += (-1 if not REVERSE else 1) * H*V
+        p_q += (-1 if not REVERSE else 1) * H * K
+        p_k += (-1 if not REVERSE else 1) * H * K
+        p_v += (-1 if not REVERSE else 1) * H * V
+        p_w += (-1 if not REVERSE else 1) * H * K
+        p_do += (-1 if not REVERSE else 1) * H * V
+        p_dk += (-1 if not REVERSE else 1) * H * K
+        p_dk1 += (-1 if not REVERSE else 1) * H * K
+        p_dv += (-1 if not REVERSE else 1) * H * V
 
     if USE_INITIAL_STATE:
-        p_dh0 = dh0 + i_nh * K*V + o_k[:, None] * V + o_v[None, :]
+        p_dh0 = dh0 + i_nh * K * V + o_k[:, None] * V + o_v[None, :]
         tl.store(p_dh0, b_dh.to(p_dh0.dtype.element_ty), mask=mask_h)
 
 
-@triton.heuristics({
-    'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
-})
+@triton.heuristics(
+    {
+        "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
+    }
+)
 @triton.autotune(
     configs=[
-        triton.Config({'BT': BT, 'BK': BK}, num_warps=num_warps)
+        triton.Config({"BT": BT, "BK": BK}, num_warps=num_warps)
         for BT in [16, 32, 64]
         for BK in [32, 64]
         for num_warps in [1, 2, 4, 8]
     ],
-    key=['K'],
+    key=["K"],
     **autotune_cache_kwargs,
 )
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=["T"])
 def fused_recurrent_rwkv6_bwd_kernel_dw(
     q,
     k,
@@ -328,17 +384,17 @@ def fused_recurrent_rwkv6_bwd_kernel_dw(
     NT = tl.cdiv(T, BT)
 
     o_i = tl.arange(0, BT)
-    m_i = tl.where(o_i[:, None] >= o_i[None, :], 1., 0.) if not REVERSE else tl.where(o_i[:, None] <= o_i[None, :], 1., 0.)
+    m_i = tl.where(o_i[:, None] >= o_i[None, :], 1.0, 0.0) if not REVERSE else tl.where(o_i[:, None] <= o_i[None, :], 1.0, 0.0)
 
     b_z = tl.zeros([BK], dtype=tl.float32)
 
     i_t = 0 if not REVERSE else NT - 1
     for _ in range(NT):
-        p_q = tl.make_block_ptr(q + (bos*H + i_h) * K, (T, K), (H*K, 1), (i_t * BT + 1, i_k * BK), (BT, BK), (1, 0))
-        p_k = tl.make_block_ptr(k + (bos*H + i_h) * K, (T-1, K), (H*K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
-        p_dq = tl.make_block_ptr(dq + (bos*H + i_h) * K, (T, K), (H*K, 1), (i_t * BT + 1, i_k * BK), (BT, BK), (1, 0))
-        p_dk = tl.make_block_ptr(dk + (bos*H + i_h) * K, (T-1, K), (H*K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
-        p_dw = tl.make_block_ptr(dw + (bos*H + i_h) * K, (T, K), (H*K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
+        p_q = tl.make_block_ptr(q + (bos * H + i_h) * K, (T, K), (H * K, 1), (i_t * BT + 1, i_k * BK), (BT, BK), (1, 0))
+        p_k = tl.make_block_ptr(k + (bos * H + i_h) * K, (T - 1, K), (H * K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
+        p_dq = tl.make_block_ptr(dq + (bos * H + i_h) * K, (T, K), (H * K, 1), (i_t * BT + 1, i_k * BK), (BT, BK), (1, 0))
+        p_dk = tl.make_block_ptr(dk + (bos * H + i_h) * K, (T - 1, K), (H * K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
+        p_dw = tl.make_block_ptr(dw + (bos * H + i_h) * K, (T, K), (H * K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
         # [BT, BK]
         b_q = tl.load(p_q, boundary_check=(0, 1)).to(tl.float32)
         b_dq = tl.load(p_dq, boundary_check=(0, 1)).to(tl.float32)
@@ -350,7 +406,7 @@ def fused_recurrent_rwkv6_bwd_kernel_dw(
         if i_t >= 0:
             b_z += tl.sum(b_dw, 0)
 
-        i_t += (1 if not REVERSE else -1)
+        i_t += 1 if not REVERSE else -1
 
 
 def fused_recurrent_rwkv6_fwd(
@@ -480,7 +536,10 @@ def fused_recurrent_rwkv6_bwd(
     dv = dv.sum(0)
 
     dw = torch.empty_like(w)
-    def grid(meta): return (triton.cdiv(meta['K'], meta['BK']), N * H)
+
+    def grid(meta):
+        return (triton.cdiv(meta["K"], meta["BK"]), N * H)
+
     fused_recurrent_rwkv6_bwd_kernel_dw[grid](
         q,
         k,
@@ -500,7 +559,6 @@ def fused_recurrent_rwkv6_bwd(
 
 
 class FusedRecurrentRWKV6Function(torch.autograd.Function):
-
     @staticmethod
     @input_guard
     @autocast_custom_fwd
@@ -635,7 +693,7 @@ def fused_recurrent_rwkv6(
         >>> assert o.allclose(o_var.view(o.shape))
         >>> assert ht.allclose(ht_var)
     """
-    if 'head_first' in kwargs:
+    if "head_first" in kwargs:
         raise DeprecationWarning(
             "head_first has been removed. Inputs must be in `[B, T, H, ...]` format.",
         )
@@ -652,6 +710,10 @@ def fused_recurrent_rwkv6(
             )
     if scale is None:
         scale = k.shape[-1] ** -0.5
+    if _can_use_cute_rwkv6(r, k, v, w, u, initial_state, reverse, cu_seqlens):
+        from fla.ops.backends.cute.rwkv6 import rwkv6_fwd_cute
+
+        return rwkv6_fwd_cute(r, k, v, w, u, initial_state, output_final_state, scale)
     o, final_state = FusedRecurrentRWKV6Function.apply(
         r,
         k,
