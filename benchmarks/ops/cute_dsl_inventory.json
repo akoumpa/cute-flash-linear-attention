@@ -1,0 +1,4148 @@
+{
+  "baseline": {
+    "cute_migration_base_commit": "bef176b4",
+    "inventory_base_commit": "bef176b4",
+    "upstream_commit": "fe8fce9f"
+  },
+  "benchmark_registry": [
+    {
+      "func_name": "chunk_comba",
+      "import_path": "fla.ops.comba",
+      "modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "name": "chunk_comba",
+      "test_file": null
+    },
+    {
+      "func_name": "chunk_delta_rule",
+      "import_path": "fla.ops.delta_rule",
+      "modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "name": "chunk_delta_rule",
+      "test_file": "tests/ops/test_delta.py"
+    },
+    {
+      "func_name": "chunk_dplr_delta_rule",
+      "import_path": "fla.ops.generalized_delta_rule",
+      "modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "name": "chunk_dplr_delta_rule",
+      "test_file": "tests/ops/test_dplr_delta.py"
+    },
+    {
+      "func_name": "chunk_gated_delta_rule",
+      "import_path": "fla.ops.gated_delta_rule",
+      "modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "name": "chunk_gdn",
+      "test_file": "tests/ops/test_gdn.py"
+    },
+    {
+      "func_name": "chunk_gla",
+      "import_path": "fla.ops.gla",
+      "modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "name": "chunk_gla",
+      "test_file": null
+    },
+    {
+      "func_name": "chunk_kda",
+      "import_path": "fla.ops.kda",
+      "modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "name": "chunk_kda",
+      "test_file": null
+    },
+    {
+      "func_name": "chunk_lightning_attn",
+      "import_path": "fla.ops.lightning_attn",
+      "modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "name": "chunk_lightning_attn",
+      "test_file": null
+    },
+    {
+      "func_name": "chunk_linear_attn",
+      "import_path": "fla.ops.linear_attn",
+      "modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "name": "chunk_linear_attn",
+      "test_file": null
+    },
+    {
+      "func_name": "chunk_retention",
+      "import_path": "fla.ops.retention",
+      "modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "name": "chunk_retention",
+      "test_file": null
+    },
+    {
+      "func_name": "chunk_rwkv6",
+      "import_path": "fla.ops.rwkv6",
+      "modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "name": "chunk_rwkv6",
+      "test_file": null
+    },
+    {
+      "func_name": "chunk_rwkv7",
+      "import_path": "fla.ops.rwkv7",
+      "modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "name": "chunk_rwkv7",
+      "test_file": null
+    },
+    {
+      "func_name": "chunk_simple_gla",
+      "import_path": "fla.ops.simple_gla",
+      "modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "name": "chunk_simple_gla",
+      "test_file": null
+    },
+    {
+      "func_name": "flash_attn_func",
+      "import_path": "flash_attn",
+      "modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "name": "flash_attn",
+      "test_file": null
+    },
+    {
+      "func_name": "fused_attnres",
+      "import_path": "fla.ops.attnres",
+      "modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "name": "fused_attnres",
+      "test_file": null
+    },
+    {
+      "func_name": "fused_recurrent_hgrn",
+      "import_path": "fla.ops.hgrn",
+      "modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "name": "fused_recurrent_hgrn",
+      "test_file": null
+    },
+    {
+      "func_name": "naive_attnres",
+      "import_path": "fla.ops.attnres",
+      "modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "name": "naive_attnres",
+      "test_file": null
+    },
+    {
+      "func_name": "parallel_attn",
+      "import_path": "fla.ops.attn",
+      "modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "name": "parallel_attn",
+      "test_file": null
+    },
+    {
+      "func_name": "parallel_nsa",
+      "import_path": "fla.ops.nsa",
+      "modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "name": "parallel_nsa",
+      "test_file": "tests/ops/test_nsa.py"
+    }
+  ],
+  "manifest_version": 1,
+  "public_ops": [
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "abc",
+      "domain_test_present": false,
+      "domain_tests": [],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "abc.chunk_abc",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "utils",
+        "utils.logcumsumexp",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/abc/chunk.py",
+      "source_module": "chunk",
+      "symbol": "chunk_abc",
+      "symbol_test_present": false,
+      "tests": []
+    },
+    {
+      "benchmark_modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "benchmark_registered": true,
+      "benchmark_targets": [
+        "parallel_attn"
+      ],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "attn",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_attn.py",
+        "tests/ops/test_attn_sink.py",
+        "tests/ops/test_attnres.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "attn.parallel_attn",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.backends.tilelang",
+        "utils",
+        "utils.constant",
+        "utils.cumsum",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/attn/parallel.py",
+      "source_module": "parallel",
+      "symbol": "parallel_attn",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_attn.py",
+        "tests/ops/test_attn_sink.py"
+      ]
+    },
+    {
+      "benchmark_modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "benchmark_registered": true,
+      "benchmark_targets": [
+        "fused_attnres"
+      ],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "attnres",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_attnres.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "attnres.fused_attnres",
+      "implementation_backends": [
+        "gluon",
+        "triton"
+      ],
+      "shared_dependencies": [
+        "utils.cache",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/attnres/fused.py",
+      "source_module": "fla.ops.attnres.fused",
+      "symbol": "fused_attnres",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_attnres.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "based",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_based.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "based.fused_chunk_based",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [],
+      "source_file": "fla/ops/based/fused_chunk.py",
+      "source_module": "fused_chunk",
+      "symbol": "fused_chunk_based",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_based.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "based",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_based.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "based.parallel_based",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [],
+      "source_file": "fla/ops/based/parallel.py",
+      "source_module": "parallel",
+      "symbol": "parallel_based",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_based.py"
+      ]
+    },
+    {
+      "benchmark_modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "benchmark_registered": true,
+      "benchmark_targets": [
+        "chunk_comba"
+      ],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "comba",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_comba.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "comba.chunk_comba",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_delta_h",
+        "common.chunk_o",
+        "utils",
+        "utils.constant",
+        "utils.index",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/comba/chunk.py",
+      "source_module": "chunk",
+      "symbol": "chunk_comba",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_comba.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "comba",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_comba.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "comba.fused_recurrent_comba",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_delta_h",
+        "common.chunk_o",
+        "utils",
+        "utils.constant",
+        "utils.index",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/comba/fused_recurrent.py",
+      "source_module": "fused_recurrent",
+      "symbol": "fused_recurrent_comba",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_comba.py"
+      ]
+    },
+    {
+      "benchmark_modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "benchmark_registered": true,
+      "benchmark_targets": [
+        "chunk_delta_rule"
+      ],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "delta_rule",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_delta.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "delta_rule.chunk_delta_rule",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_delta_h",
+        "common.chunk_o",
+        "common.chunk_scaled_dot_kkt",
+        "utils",
+        "utils.index",
+        "utils.op",
+        "utils.solve_tril"
+      ],
+      "source_file": "fla/ops/delta_rule/chunk.py",
+      "source_module": "chunk",
+      "symbol": "chunk_delta_rule",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_delta.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "delta_rule",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_delta.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "delta_rule.fused_chunk_delta_rule",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_delta_h",
+        "common.chunk_o",
+        "common.chunk_scaled_dot_kkt",
+        "utils",
+        "utils.index",
+        "utils.op",
+        "utils.solve_tril"
+      ],
+      "source_file": "fla/ops/delta_rule/fused_chunk.py",
+      "source_module": "fused_chunk",
+      "symbol": "fused_chunk_delta_rule",
+      "symbol_test_present": false,
+      "tests": []
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "delta_rule",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_delta.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "delta_rule.fused_recurrent_delta_rule",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_delta_h",
+        "common.chunk_o",
+        "common.chunk_scaled_dot_kkt",
+        "utils",
+        "utils.index",
+        "utils.op",
+        "utils.solve_tril"
+      ],
+      "source_file": "fla/ops/delta_rule/fused_recurrent.py",
+      "source_module": "fused_recurrent",
+      "symbol": "fused_recurrent_delta_rule",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_delta.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "deltaformer",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_deltaformer.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "deltaformer.deltaformer_attn",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [],
+      "source_file": "fla/ops/deltaformer/parallel.py",
+      "source_module": "parallel",
+      "symbol": "deltaformer_attn",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_deltaformer.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "forgetting_attn",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_forgetting_attn.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "forgetting_attn.parallel_forgetting_attn",
+      "implementation_backends": [],
+      "shared_dependencies": [],
+      "source_file": "fla/ops/forgetting_attn/parallel.py",
+      "source_module": "parallel",
+      "symbol": "parallel_forgetting_attn",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_forgetting_attn.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "gated_delta_product",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_delta_product.py",
+        "tests/ops/test_gdp.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "gated_delta_product.chunk_gated_delta_product",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_scaled_dot_kkt",
+        "utils",
+        "utils.constant",
+        "utils.index",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/gated_delta_product/chunk.py",
+      "source_module": "chunk",
+      "symbol": "chunk_gated_delta_product",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_delta_product.py",
+        "tests/ops/test_gdp.py"
+      ]
+    },
+    {
+      "benchmark_modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "benchmark_registered": true,
+      "benchmark_targets": [
+        "chunk_gdn"
+      ],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "gated_delta_rule",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/context_parallel/test_cp_gdn.py",
+        "tests/ops/test_gdn.py",
+        "tests/ops/test_gdn_kernels.py",
+        "tests/ops/test_intracard_cache.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "gated_delta_rule.chunk_gated_delta_rule",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_delta_h",
+        "common.chunk_o",
+        "common.chunk_scaled_dot_kkt",
+        "common.gate",
+        "cp",
+        "cp.chunk_delta_h",
+        "utils",
+        "utils.cache",
+        "utils.constant",
+        "utils.index",
+        "utils.op",
+        "utils.softplus"
+      ],
+      "source_file": "fla/ops/gated_delta_rule/chunk.py",
+      "source_module": "chunk",
+      "symbol": "chunk_gated_delta_rule",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/context_parallel/test_cp_gdn.py",
+        "tests/ops/test_comba.py",
+        "tests/ops/test_gdn.py",
+        "tests/ops/test_gdn_kernels.py",
+        "tests/ops/test_gdp.py",
+        "tests/ops/test_intracard_cache.py",
+        "tests/ops/test_kda.py",
+        "tests/ops/test_mesa.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "gated_delta_rule",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/context_parallel/test_cp_gdn.py",
+        "tests/ops/test_gdn.py",
+        "tests/ops/test_gdn_kernels.py",
+        "tests/ops/test_intracard_cache.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "gated_delta_rule.chunk_gdn",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_delta_h",
+        "common.chunk_o",
+        "common.chunk_scaled_dot_kkt",
+        "common.gate",
+        "cp",
+        "cp.chunk_delta_h",
+        "utils",
+        "utils.cache",
+        "utils.constant",
+        "utils.index",
+        "utils.op",
+        "utils.softplus"
+      ],
+      "source_file": "fla/ops/gated_delta_rule/chunk.py",
+      "source_module": "chunk",
+      "symbol": "chunk_gdn",
+      "symbol_test_present": false,
+      "tests": []
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "gated_delta_rule",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/context_parallel/test_cp_gdn.py",
+        "tests/ops/test_gdn.py",
+        "tests/ops/test_gdn_kernels.py",
+        "tests/ops/test_intracard_cache.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "gated_delta_rule.fused_recurrent_gated_delta_rule",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_delta_h",
+        "common.chunk_o",
+        "common.chunk_scaled_dot_kkt",
+        "common.gate",
+        "cp",
+        "cp.chunk_delta_h",
+        "utils",
+        "utils.cache",
+        "utils.constant",
+        "utils.index",
+        "utils.op",
+        "utils.softplus"
+      ],
+      "source_file": "fla/ops/gated_delta_rule/fused_recurrent.py",
+      "source_module": "fused_recurrent",
+      "symbol": "fused_recurrent_gated_delta_rule",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_gdn.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "gated_delta_rule",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/context_parallel/test_cp_gdn.py",
+        "tests/ops/test_gdn.py",
+        "tests/ops/test_gdn_kernels.py",
+        "tests/ops/test_intracard_cache.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "gated_delta_rule.fused_recurrent_gdn",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_delta_h",
+        "common.chunk_o",
+        "common.chunk_scaled_dot_kkt",
+        "common.gate",
+        "cp",
+        "cp.chunk_delta_h",
+        "utils",
+        "utils.cache",
+        "utils.constant",
+        "utils.index",
+        "utils.op",
+        "utils.softplus"
+      ],
+      "source_file": "fla/ops/gated_delta_rule/fused_recurrent.py",
+      "source_module": "fused_recurrent",
+      "symbol": "fused_recurrent_gdn",
+      "symbol_test_present": false,
+      "tests": []
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "gated_oja_rule",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_oja.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "gated_oja_rule.chunk_gated_oja_rule",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "utils",
+        "utils.index",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/gated_oja_rule/chunk.py",
+      "source_module": "chunk",
+      "symbol": "chunk_gated_oja_rule",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_oja.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "gated_oja_rule",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_oja.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "gated_oja_rule.fused_recurrent_gated_oja_rule",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "utils",
+        "utils.index",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/gated_oja_rule/fused_recurrent.py",
+      "source_module": "fused_recurrent",
+      "symbol": "fused_recurrent_gated_oja_rule",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_oja.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "gdn2",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_gdn2.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "gdn2.chunk_gdn2",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_delta_h",
+        "utils",
+        "utils.cache",
+        "utils.constant",
+        "utils.op",
+        "utils.softplus"
+      ],
+      "source_file": "fla/ops/gdn2/chunk.py",
+      "source_module": "chunk",
+      "symbol": "chunk_gdn2",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_gdn2.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "gdn2",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_gdn2.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "gdn2.fused_recurrent_gdn2",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_delta_h",
+        "utils",
+        "utils.cache",
+        "utils.constant",
+        "utils.op",
+        "utils.softplus"
+      ],
+      "source_file": "fla/ops/gdn2/fused_recurrent.py",
+      "source_module": "fused_recurrent",
+      "symbol": "fused_recurrent_gdn2",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_gdn2.py"
+      ]
+    },
+    {
+      "benchmark_modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "benchmark_registered": true,
+      "benchmark_targets": [
+        "chunk_dplr_delta_rule"
+      ],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "generalized_delta_rule",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/context_parallel/test_cp_dplr.py",
+        "tests/ops/test_dplr_delta.py",
+        "tests/ops/test_iplr_delta.py",
+        "tests/ops/test_rwkv7.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "generalized_delta_rule.chunk_dplr_delta_rule",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "cp",
+        "cp.chunk_delta_h",
+        "utils",
+        "utils.constant",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/generalized_delta_rule/dplr/__init__.py",
+      "source_module": "dplr",
+      "symbol": "chunk_dplr_delta_rule",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/context_parallel/test_cp_dplr.py",
+        "tests/context_parallel/test_cp_rwkv7.py",
+        "tests/ops/test_dplr_delta.py",
+        "tests/ops/test_rwkv7.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "generalized_delta_rule",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/context_parallel/test_cp_dplr.py",
+        "tests/ops/test_dplr_delta.py",
+        "tests/ops/test_iplr_delta.py",
+        "tests/ops/test_rwkv7.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "generalized_delta_rule.chunk_iplr_delta_rule",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "cp",
+        "cp.chunk_delta_h",
+        "utils",
+        "utils.constant",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/generalized_delta_rule/iplr/__init__.py",
+      "source_module": "iplr",
+      "symbol": "chunk_iplr_delta_rule",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_iplr_delta.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "generalized_delta_rule",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/context_parallel/test_cp_dplr.py",
+        "tests/ops/test_dplr_delta.py",
+        "tests/ops/test_iplr_delta.py",
+        "tests/ops/test_rwkv7.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "generalized_delta_rule.fused_recurrent_dplr_delta_rule",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "cp",
+        "cp.chunk_delta_h",
+        "utils",
+        "utils.constant",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/generalized_delta_rule/dplr/__init__.py",
+      "source_module": "dplr",
+      "symbol": "fused_recurrent_dplr_delta_rule",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_dplr_delta.py",
+        "tests/ops/test_rwkv7.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "generalized_delta_rule",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/context_parallel/test_cp_dplr.py",
+        "tests/ops/test_dplr_delta.py",
+        "tests/ops/test_iplr_delta.py",
+        "tests/ops/test_rwkv7.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "generalized_delta_rule.fused_recurrent_iplr_delta_rule",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "cp",
+        "cp.chunk_delta_h",
+        "utils",
+        "utils.constant",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/generalized_delta_rule/iplr/__init__.py",
+      "source_module": "iplr",
+      "symbol": "fused_recurrent_iplr_delta_rule",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_iplr_delta.py"
+      ]
+    },
+    {
+      "benchmark_modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "benchmark_registered": true,
+      "benchmark_targets": [
+        "chunk_gla"
+      ],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "gla",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_gla.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "gla.chunk_gla",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_h",
+        "common.fused_recurrent",
+        "utils",
+        "utils.cache",
+        "utils.constant",
+        "utils.cumsum",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/gla/chunk.py",
+      "source_module": "chunk",
+      "symbol": "chunk_gla",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_gla.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "gla",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_gla.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "gla.fused_chunk_gla",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_h",
+        "common.fused_recurrent",
+        "utils",
+        "utils.cache",
+        "utils.constant",
+        "utils.cumsum",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/gla/fused_chunk.py",
+      "source_module": "fused_chunk",
+      "symbol": "fused_chunk_gla",
+      "symbol_test_present": false,
+      "tests": []
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "gla",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_gla.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "gla.fused_recurrent_gla",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_h",
+        "common.fused_recurrent",
+        "utils",
+        "utils.cache",
+        "utils.constant",
+        "utils.cumsum",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/gla/fused_recurrent.py",
+      "source_module": "fused_recurrent",
+      "symbol": "fused_recurrent_gla",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_gla.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "gsa",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_gsa.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "gsa.chunk_gsa",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_h",
+        "common.fused_recurrent",
+        "utils",
+        "utils.constant",
+        "utils.cumsum",
+        "utils.op",
+        "utils.softmax"
+      ],
+      "source_file": "fla/ops/gsa/chunk.py",
+      "source_module": "chunk",
+      "symbol": "chunk_gsa",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_gsa.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "gsa",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_gsa.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "gsa.fused_recurrent_gsa",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_h",
+        "common.fused_recurrent",
+        "utils",
+        "utils.constant",
+        "utils.cumsum",
+        "utils.op",
+        "utils.softmax"
+      ],
+      "source_file": "fla/ops/gsa/fused_recurrent.py",
+      "source_module": "fused_recurrent",
+      "symbol": "fused_recurrent_gsa",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_gsa.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "hgrn",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_hgrn.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "hgrn.chunk_hgrn",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "utils.op"
+      ],
+      "source_file": "fla/ops/hgrn/chunk.py",
+      "source_module": "chunk",
+      "symbol": "chunk_hgrn",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_hgrn.py"
+      ]
+    },
+    {
+      "benchmark_modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "benchmark_registered": true,
+      "benchmark_targets": [
+        "fused_recurrent_hgrn"
+      ],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "hgrn",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_hgrn.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "hgrn.fused_recurrent_hgrn",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "utils.op"
+      ],
+      "source_file": "fla/ops/hgrn/fused_recurrent.py",
+      "source_module": "fused_recurrent",
+      "symbol": "fused_recurrent_hgrn",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_hgrn.py"
+      ]
+    },
+    {
+      "benchmark_modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "benchmark_registered": true,
+      "benchmark_targets": [
+        "chunk_kda"
+      ],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "kda",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/context_parallel/test_cp_kda.py",
+        "tests/ops/test_backends.py",
+        "tests/ops/test_gdn2.py",
+        "tests/ops/test_intracard_cache.py",
+        "tests/ops/test_kda.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "kda.chunk_kda",
+      "implementation_backends": [
+        "external_cutlass",
+        "tilelang",
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_delta_h",
+        "common.gate",
+        "cp",
+        "cp.chunk_delta_h",
+        "utils",
+        "utils.cache",
+        "utils.constant",
+        "utils.index",
+        "utils.op",
+        "utils.softplus"
+      ],
+      "source_file": "fla/ops/kda/chunk.py",
+      "source_module": "chunk",
+      "symbol": "chunk_kda",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/context_parallel/test_cp_kda.py",
+        "tests/ops/test_intracard_cache.py",
+        "tests/ops/test_kda.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "kda",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/context_parallel/test_cp_kda.py",
+        "tests/ops/test_backends.py",
+        "tests/ops/test_gdn2.py",
+        "tests/ops/test_intracard_cache.py",
+        "tests/ops/test_kda.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "kda.fused_recurrent_kda",
+      "implementation_backends": [
+        "external_cutlass",
+        "tilelang",
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_delta_h",
+        "common.gate",
+        "cp",
+        "cp.chunk_delta_h",
+        "utils",
+        "utils.cache",
+        "utils.constant",
+        "utils.index",
+        "utils.op",
+        "utils.softplus"
+      ],
+      "source_file": "fla/ops/kda/fused_recurrent.py",
+      "source_module": "fused_recurrent",
+      "symbol": "fused_recurrent_kda",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_kda.py"
+      ]
+    },
+    {
+      "benchmark_modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "benchmark_registered": true,
+      "benchmark_targets": [
+        "chunk_lightning_attn"
+      ],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "lightning_attn",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_lightning_attn.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "lightning_attn.chunk_lightning_attn",
+      "implementation_backends": [],
+      "shared_dependencies": [],
+      "source_file": "fla/ops/lightning_attn/chunk.py",
+      "source_module": "chunk",
+      "symbol": "chunk_lightning_attn",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_lightning_attn.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "lightning_attn",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_lightning_attn.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "lightning_attn.fused_recurrent_lightning_attn",
+      "implementation_backends": [],
+      "shared_dependencies": [],
+      "source_file": "fla/ops/lightning_attn/fused_recurrent.py",
+      "source_module": "fused_recurrent",
+      "symbol": "fused_recurrent_lightning_attn",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_lightning_attn.py"
+      ]
+    },
+    {
+      "benchmark_modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "benchmark_registered": true,
+      "benchmark_targets": [
+        "chunk_linear_attn"
+      ],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "linear_attn",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_linear_attn.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "linear_attn.chunk_linear_attn",
+      "implementation_backends": [],
+      "shared_dependencies": [
+        "utils.cumsum"
+      ],
+      "source_file": "fla/ops/linear_attn/chunk.py",
+      "source_module": "chunk",
+      "symbol": "chunk_linear_attn",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_linear_attn.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "linear_attn",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_linear_attn.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "linear_attn.fused_chunk_linear_attn",
+      "implementation_backends": [],
+      "shared_dependencies": [
+        "utils.cumsum"
+      ],
+      "source_file": "fla/ops/linear_attn/fused_chunk.py",
+      "source_module": "fused_chunk",
+      "symbol": "fused_chunk_linear_attn",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_linear_attn.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "linear_attn",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_linear_attn.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "linear_attn.fused_recurrent_linear_attn",
+      "implementation_backends": [],
+      "shared_dependencies": [
+        "utils.cumsum"
+      ],
+      "source_file": "fla/ops/linear_attn/fused_recurrent.py",
+      "source_module": "fused_recurrent",
+      "symbol": "fused_recurrent_linear_attn",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_linear_attn.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "log_linear_attn",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_log_linear_attn.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "log_linear_attn.chunk_log_linear_attn",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "utils",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/log_linear_attn/chunk.py",
+      "source_module": "chunk",
+      "symbol": "chunk_log_linear_attn",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_log_linear_attn.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "mesa_net",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_mesa.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "mesa_net.chunk_mesa_net",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_h",
+        "utils",
+        "utils.constant",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/mesa_net/chunk.py",
+      "source_module": "chunk",
+      "symbol": "chunk_mesa_net",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_mesa.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "mesa_net",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_mesa.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "mesa_net.mesa_net_decoding_one_step",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_h",
+        "utils",
+        "utils.constant",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/mesa_net/decoding_one_step.py",
+      "source_module": "decoding_one_step",
+      "symbol": "mesa_net_decoding_one_step",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_mesa.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "moba",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_moba.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "moba.parallel_moba",
+      "implementation_backends": [],
+      "shared_dependencies": [
+        "utils.index"
+      ],
+      "source_file": "fla/ops/moba/parallel.py",
+      "source_module": "parallel",
+      "symbol": "parallel_moba",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/models/test_modeling_moba.py",
+        "tests/ops/test_moba.py"
+      ]
+    },
+    {
+      "benchmark_modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "benchmark_registered": true,
+      "benchmark_targets": [
+        "parallel_nsa"
+      ],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "nsa",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_nsa.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "nsa.parallel_nsa",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "utils",
+        "utils.op",
+        "utils.pooling"
+      ],
+      "source_file": "fla/ops/nsa/parallel.py",
+      "source_module": "parallel",
+      "symbol": "parallel_nsa",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_nsa.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "parallax",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_parallax.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "parallax.parallel_parallax",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "utils",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/parallax/parallel.py",
+      "source_module": "parallel",
+      "symbol": "parallel_parallax",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_parallax.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "path_attn",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_path_attn.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "path_attn.parallel_path_attn",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_scaled_dot_kkt",
+        "utils",
+        "utils.cumsum",
+        "utils.op",
+        "utils.solve_tril"
+      ],
+      "source_file": "fla/ops/path_attn/parallel.py",
+      "source_module": "parallel",
+      "symbol": "parallel_path_attn",
+      "symbol_test_present": false,
+      "tests": []
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "rebased",
+      "domain_test_present": false,
+      "domain_tests": [],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "rebased.parallel_rebased",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [],
+      "source_file": "fla/ops/rebased/parallel.py",
+      "source_module": "parallel",
+      "symbol": "parallel_rebased",
+      "symbol_test_present": false,
+      "tests": []
+    },
+    {
+      "benchmark_modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "benchmark_registered": true,
+      "benchmark_targets": [
+        "chunk_retention"
+      ],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "retention",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_retention.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "retention.chunk_retention",
+      "implementation_backends": [],
+      "shared_dependencies": [],
+      "source_file": "fla/ops/retention/chunk.py",
+      "source_module": "chunk",
+      "symbol": "chunk_retention",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_retention.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "retention",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_retention.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "retention.fused_chunk_retention",
+      "implementation_backends": [],
+      "shared_dependencies": [],
+      "source_file": "fla/ops/retention/fused_chunk.py",
+      "source_module": "fused_chunk",
+      "symbol": "fused_chunk_retention",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_retention.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "retention",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_retention.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "retention.fused_recurrent_retention",
+      "implementation_backends": [],
+      "shared_dependencies": [],
+      "source_file": "fla/ops/retention/fused_recurrent.py",
+      "source_module": "fused_recurrent",
+      "symbol": "fused_recurrent_retention",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_retention.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "retention",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_retention.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "retention.parallel_retention",
+      "implementation_backends": [],
+      "shared_dependencies": [],
+      "source_file": "fla/ops/retention/parallel.py",
+      "source_module": "parallel",
+      "symbol": "parallel_retention",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_retention.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "rwkv4",
+      "domain_test_present": false,
+      "domain_tests": [],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "rwkv4.fused_recurrent_rwkv4",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "utils.op"
+      ],
+      "source_file": "fla/ops/rwkv4/fused_recurrent.py",
+      "source_module": "fused_recurrent",
+      "symbol": "fused_recurrent_rwkv4",
+      "symbol_test_present": false,
+      "tests": []
+    },
+    {
+      "benchmark_modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "benchmark_registered": true,
+      "benchmark_targets": [
+        "chunk_rwkv6"
+      ],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "rwkv6",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_rwkv6.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "rwkv6.chunk_rwkv6",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_h",
+        "utils",
+        "utils.constant",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/rwkv6/chunk.py",
+      "source_module": "chunk",
+      "symbol": "chunk_rwkv6",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_rwkv6.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "rwkv6",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_rwkv6.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "rwkv6.fused_recurrent_rwkv6",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_h",
+        "utils",
+        "utils.constant",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/rwkv6/fused_recurrent.py",
+      "source_module": "fused_recurrent",
+      "symbol": "fused_recurrent_rwkv6",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_rwkv6.py"
+      ]
+    },
+    {
+      "benchmark_modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "benchmark_registered": true,
+      "benchmark_targets": [
+        "chunk_rwkv7"
+      ],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "rwkv7",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/context_parallel/test_cp_rwkv7.py",
+        "tests/ops/test_rwkv7.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "rwkv7.chunk_rwkv7",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "cp",
+        "utils",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/rwkv7/chunk.py",
+      "source_module": "chunk",
+      "symbol": "chunk_rwkv7",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/context_parallel/test_cp_rwkv7.py",
+        "tests/ops/test_rwkv7.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "rwkv7",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/context_parallel/test_cp_rwkv7.py",
+        "tests/ops/test_rwkv7.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "rwkv7.fused_mul_recurrent_rwkv7",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "cp",
+        "utils",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/rwkv7/fused_recurrent.py",
+      "source_module": "fused_recurrent",
+      "symbol": "fused_mul_recurrent_rwkv7",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_rwkv7.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "rwkv7",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/context_parallel/test_cp_rwkv7.py",
+        "tests/ops/test_rwkv7.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "rwkv7.fused_recurrent_rwkv7",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "cp",
+        "utils",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/rwkv7/fused_recurrent.py",
+      "source_module": "fused_recurrent",
+      "symbol": "fused_recurrent_rwkv7",
+      "symbol_test_present": false,
+      "tests": []
+    },
+    {
+      "benchmark_modes": [
+        "fwd",
+        "fwdbwd"
+      ],
+      "benchmark_registered": true,
+      "benchmark_targets": [
+        "chunk_simple_gla"
+      ],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "simple_gla",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_simple_gla.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "simple_gla.chunk_simple_gla",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_h",
+        "common.chunk_o",
+        "common.fused_chunk",
+        "common.fused_recurrent",
+        "utils",
+        "utils.constant",
+        "utils.cumsum",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/simple_gla/chunk.py",
+      "source_module": "chunk",
+      "symbol": "chunk_simple_gla",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_simple_gla.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "simple_gla",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_simple_gla.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "simple_gla.fused_chunk_simple_gla",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_h",
+        "common.chunk_o",
+        "common.fused_chunk",
+        "common.fused_recurrent",
+        "utils",
+        "utils.constant",
+        "utils.cumsum",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/simple_gla/fused_chunk.py",
+      "source_module": "fused_chunk",
+      "symbol": "fused_chunk_simple_gla",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_simple_gla.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "simple_gla",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_simple_gla.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "simple_gla.fused_recurrent_simple_gla",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_h",
+        "common.chunk_o",
+        "common.fused_chunk",
+        "common.fused_recurrent",
+        "utils",
+        "utils.constant",
+        "utils.cumsum",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/simple_gla/fused_recurrent.py",
+      "source_module": "fused_recurrent",
+      "symbol": "fused_recurrent_simple_gla",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_simple_gla.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "simple_gla",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_simple_gla.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "simple_gla.parallel_simple_gla",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "common.chunk_h",
+        "common.chunk_o",
+        "common.fused_chunk",
+        "common.fused_recurrent",
+        "utils",
+        "utils.constant",
+        "utils.cumsum",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/simple_gla/parallel.py",
+      "source_module": "parallel",
+      "symbol": "parallel_simple_gla",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_simple_gla.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "ttt",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_ttt.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "ttt.chunk_ttt_linear",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "utils"
+      ],
+      "source_file": "fla/ops/ttt/chunk.py",
+      "source_module": "chunk",
+      "symbol": "chunk_ttt_linear",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_ttt.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "ttt",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_ttt.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "ttt.fused_chunk_ttt_linear",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "utils"
+      ],
+      "source_file": "fla/ops/ttt/fused_chunk.py",
+      "source_module": "fused_chunk",
+      "symbol": "fused_chunk_ttt_linear",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_ttt.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "wall_attn",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_wall_attn.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "wall_attn.parallel_wall_attn",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "utils",
+        "utils.constant",
+        "utils.cumsum",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/wall_attn/parallel.py",
+      "source_module": "parallel",
+      "symbol": "parallel_wall_attn",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_wall_attn.py"
+      ]
+    },
+    {
+      "benchmark_modes": [],
+      "benchmark_registered": false,
+      "benchmark_targets": [],
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "domain": "wall_attn",
+      "domain_test_present": true,
+      "domain_tests": [
+        "tests/ops/test_wall_attn.py"
+      ],
+      "evidence": {
+        "benchmark": {
+          "rows": [],
+          "status": "unrun"
+        },
+        "correctness": {
+          "artifact": null,
+          "command": null,
+          "status": "unrun"
+        },
+        "ncu": {
+          "artifacts": [],
+          "metrics": {},
+          "status": "unrun"
+        }
+      },
+      "id": "wall_attn.parallel_wall_attn_decode",
+      "implementation_backends": [
+        "triton"
+      ],
+      "shared_dependencies": [
+        "utils",
+        "utils.constant",
+        "utils.cumsum",
+        "utils.op"
+      ],
+      "source_file": "fla/ops/wall_attn/decode.py",
+      "source_module": "decode",
+      "symbol": "parallel_wall_attn_decode",
+      "symbol_test_present": true,
+      "tests": [
+        "tests/ops/test_wall_attn.py"
+      ]
+    }
+  ],
+  "scope": {
+    "helper_exclusions": [
+      "wall_attn.build_wall_kv_cache"
+    ],
+    "public_definition": "optimized symbols in operator subpackage __all__ exports",
+    "reference_exclusions": "symbols imported from naive.py or prefixed naive_",
+    "shared_definition": "kernel-bearing Python files under fla/ops/common, fla/ops/utils, and fla/ops/cp"
+  },
+  "shared_internals": [
+    {
+      "consumer_count": 0,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [],
+      "file": "fla/ops/common/backends/tilelang/chunk_bwd.py",
+      "id": "common.backends.tilelang.chunk_bwd",
+      "implementation_backends": [
+        "tilelang"
+      ],
+      "kernel_symbols": [
+        "kernel",
+        "kernel"
+      ],
+      "tests": []
+    },
+    {
+      "consumer_count": 0,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [],
+      "file": "fla/ops/common/backends/tilelang/parallel_attn_bwd.py",
+      "id": "common.backends.tilelang.parallel_attn_bwd",
+      "implementation_backends": [
+        "tilelang"
+      ],
+      "kernel_symbols": [
+        "kernel",
+        "kernel"
+      ],
+      "tests": []
+    },
+    {
+      "consumer_count": 0,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [],
+      "file": "fla/ops/common/backends/tilelang/parallel_attn_fwd.py",
+      "id": "common.backends.tilelang.parallel_attn_fwd",
+      "implementation_backends": [
+        "tilelang"
+      ],
+      "kernel_symbols": [
+        "kernel",
+        "kernel"
+      ],
+      "tests": []
+    },
+    {
+      "consumer_count": 0,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [],
+      "file": "fla/ops/common/backends/triton_ascend/chunk_delta_h.py",
+      "id": "common.backends.triton_ascend.chunk_delta_h",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "chunk_gated_delta_rule_fwd_kernel_h_blockdim64_npu",
+        "chunk_gated_delta_rule_bwd_kernel_dhu_blockdim64_npu"
+      ],
+      "tests": []
+    },
+    {
+      "consumer_count": 0,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [],
+      "file": "fla/ops/common/backends/triton_ascend/chunk_o.py",
+      "id": "common.backends.triton_ascend.chunk_o",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "chunk_fwd_kernel_o_inter_npu",
+        "chunk_fwd_kernel_o_fused_hv1_npu",
+        "chunk_fwd_kernel_o_intra_hv1_npu",
+        "chunk_fwd_kernel_o_intra_npu",
+        "chunk_bwd_kernel_dv_local_hv1_npu",
+        "chunk_bwd_kernel_dv_local_npu",
+        "chunk_bwd_kernel_dqkwg_npu",
+        "chunk_bwd_kernel_dg_npu"
+      ],
+      "tests": []
+    },
+    {
+      "consumer_count": 0,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [],
+      "file": "fla/ops/common/backends/triton_ascend/chunk_scaled_dot_kkt.py",
+      "id": "common.backends.triton_ascend.chunk_scaled_dot_kkt",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "chunk_scaled_dot_kkt_fwd_kernel_npu"
+      ],
+      "tests": []
+    },
+    {
+      "consumer_count": 0,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [],
+      "file": "fla/ops/common/backends/triton_ascend/gate.py",
+      "id": "common.backends.triton_ascend.gate",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "fused_beta_sigmoid_fwd_kernel",
+        "fused_beta_sigmoid_bwd_kernel"
+      ],
+      "tests": []
+    },
+    {
+      "consumer_count": 7,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [
+        "fla/ops/comba/chunk.py",
+        "fla/ops/delta_rule/chunk.py",
+        "fla/ops/gated_delta_rule/chunk.py",
+        "fla/ops/gdn2/chunk_bwd.py",
+        "fla/ops/gdn2/chunk_fwd.py",
+        "fla/ops/kda/chunk_bwd.py",
+        "fla/ops/kda/chunk_fwd.py"
+      ],
+      "file": "fla/ops/common/chunk_delta_h.py",
+      "id": "common.chunk_delta_h",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "chunk_gated_delta_rule_fwd_kernel_h_blockdim64",
+        "chunk_gated_delta_rule_bwd_kernel_dhu_blockdim64"
+      ],
+      "tests": [
+        "tests/ops/test_gdn.py",
+        "tests/ops/test_gdn_kernels.py"
+      ]
+    },
+    {
+      "consumer_count": 5,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [
+        "fla/ops/gla/chunk.py",
+        "fla/ops/gsa/chunk.py",
+        "fla/ops/mesa_net/chunk.py",
+        "fla/ops/rwkv6/chunk.py",
+        "fla/ops/simple_gla/chunk.py"
+      ],
+      "file": "fla/ops/common/chunk_h.py",
+      "id": "common.chunk_h",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "chunk_fwd_kernel_h",
+        "chunk_bwd_kernel_dh"
+      ],
+      "tests": []
+    },
+    {
+      "consumer_count": 0,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [],
+      "file": "fla/ops/common/chunk_h_parallel.py",
+      "id": "common.chunk_h_parallel",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "chunk_fwd_kernel_h_parallel",
+        "chunk_fwd_kernel_h_reduction",
+        "chunk_bwd_kernel_dh_parallel",
+        "chunk_bwd_kernel_dh_reduction"
+      ],
+      "tests": []
+    },
+    {
+      "consumer_count": 0,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [],
+      "file": "fla/ops/common/chunk_h_split.py",
+      "id": "common.chunk_h_split",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "chunk_fwd_kernel_h_split",
+        "chunk_fwd_kernel_h_reduction",
+        "chunk_bwd_kernel_dh_split",
+        "chunk_bwd_kernel_dh_reduction"
+      ],
+      "tests": []
+    },
+    {
+      "consumer_count": 4,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [
+        "fla/ops/comba/chunk.py",
+        "fla/ops/delta_rule/chunk.py",
+        "fla/ops/gated_delta_rule/chunk.py",
+        "fla/ops/simple_gla/chunk.py"
+      ],
+      "file": "fla/ops/common/chunk_o.py",
+      "id": "common.chunk_o",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "chunk_fwd_kernel_o",
+        "chunk_bwd_kernel_dqkwg",
+        "chunk_bwd_kernel_dv",
+        "chunk_bwd_kernel_dv_local"
+      ],
+      "tests": [
+        "tests/ops/test_gdn_kernels.py"
+      ]
+    },
+    {
+      "consumer_count": 5,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [
+        "fla/ops/delta_rule/wy_fast.py",
+        "fla/ops/gated_delta_product/chunk.py",
+        "fla/ops/gated_delta_rule/backends/triton_ascend/chunk_fwd.py",
+        "fla/ops/gated_delta_rule/chunk_fwd.py",
+        "fla/ops/path_attn/parallel.py"
+      ],
+      "file": "fla/ops/common/chunk_scaled_dot_kkt.py",
+      "id": "common.chunk_scaled_dot_kkt",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "chunk_scaled_dot_kkt_fwd_kernel"
+      ],
+      "tests": [
+        "tests/ops/test_solve_tril.py"
+      ]
+    },
+    {
+      "consumer_count": 1,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [
+        "fla/ops/simple_gla/fused_chunk.py"
+      ],
+      "file": "fla/ops/common/fused_chunk.py",
+      "id": "common.fused_chunk",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "fused_chunk_fwd_kernel",
+        "fused_chunk_bwd_kernel"
+      ],
+      "tests": []
+    },
+    {
+      "consumer_count": 3,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [
+        "fla/ops/gla/fused_recurrent.py",
+        "fla/ops/gsa/fused_recurrent.py",
+        "fla/ops/simple_gla/fused_recurrent.py"
+      ],
+      "file": "fla/ops/common/fused_recurrent.py",
+      "id": "common.fused_recurrent",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "fused_recurrent_fwd_kernel",
+        "fused_recurrent_bwd_kernel"
+      ],
+      "tests": []
+    },
+    {
+      "consumer_count": 2,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [
+        "fla/ops/gated_delta_rule/chunk.py",
+        "fla/ops/kda/chunk.py"
+      ],
+      "file": "fla/ops/common/gate.py",
+      "id": "common.gate",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "fused_beta_sigmoid_fwd_kernel",
+        "fused_beta_sigmoid_bwd_kernel"
+      ],
+      "tests": []
+    },
+    {
+      "consumer_count": 0,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [],
+      "file": "fla/ops/utils/backends/triton_ascend/cumsum.py",
+      "id": "utils.backends.triton_ascend.cumsum",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "chunk_local_cumsum_scalar_kernel_npu",
+        "chunk_local_cumsum_vector_kernel_npu",
+        "chunk_global_cumsum_scalar_kernel_npu",
+        "chunk_global_cumsum_vector_kernel_npu"
+      ],
+      "tests": []
+    },
+    {
+      "consumer_count": 0,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [],
+      "file": "fla/ops/utils/backends/triton_ascend/solve_tril.py",
+      "id": "utils.backends.triton_ascend.solve_tril",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "solve_tril_16x16_kernel_npu",
+        "merge_16x16_to_32x32_inverse_kernel_npu",
+        "merge_16x16_to_64x64_inverse_kernel_npu"
+      ],
+      "tests": []
+    },
+    {
+      "consumer_count": 0,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [],
+      "file": "fla/ops/utils/csr.py",
+      "id": "utils.csr",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "prepare_block_csr_kernel"
+      ],
+      "tests": [
+        "tests/ops/utils/test_csr.py"
+      ]
+    },
+    {
+      "consumer_count": 9,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [
+        "fla/ops/attn/decoding.py",
+        "fla/ops/attn/parallel.py",
+        "fla/ops/gla/chunk.py",
+        "fla/ops/gsa/chunk.py",
+        "fla/ops/linear_attn/utils.py",
+        "fla/ops/path_attn/parallel.py",
+        "fla/ops/simple_gla/parallel.py",
+        "fla/ops/wall_attn/naive.py",
+        "fla/ops/wall_attn/parallel.py"
+      ],
+      "file": "fla/ops/utils/cumsum.py",
+      "id": "utils.cumsum",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "chunk_local_cumsum_scalar_kernel",
+        "chunk_local_cumsum_vector_kernel",
+        "chunk_global_cumsum_scalar_kernel",
+        "chunk_global_cumsum_vector_kernel"
+      ],
+      "tests": [
+        "tests/ops/test_wall_attn.py"
+      ]
+    },
+    {
+      "consumer_count": 11,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [
+        "fla/ops/comba/utils.py",
+        "fla/ops/common/intracard_cp.py",
+        "fla/ops/delta_rule/chunk.py",
+        "fla/ops/gated_delta_product/chunk.py",
+        "fla/ops/gated_delta_rule/backends/triton_ascend/gate.py",
+        "fla/ops/gated_delta_rule/chunk.py",
+        "fla/ops/gated_delta_rule/gate.py",
+        "fla/ops/gated_oja_rule/chunk.py",
+        "fla/ops/kda/chunk.py",
+        "fla/ops/kda/gate.py",
+        "fla/ops/moba/parallel.py"
+      ],
+      "file": "fla/ops/utils/index.py",
+      "id": "utils.index",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "prepare_position_ids_kernel"
+      ],
+      "tests": [
+        "tests/ops/utils/test_index.py",
+        "tests/ops/utils/test_pack.py"
+      ]
+    },
+    {
+      "consumer_count": 1,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [
+        "fla/ops/abc/chunk.py"
+      ],
+      "file": "fla/ops/utils/logcumsumexp.py",
+      "id": "utils.logcumsumexp",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "logcumsumexp_fwd_kernel"
+      ],
+      "tests": []
+    },
+    {
+      "consumer_count": 0,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [],
+      "file": "fla/ops/utils/logsumexp.py",
+      "id": "utils.logsumexp",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "logsumexp_fwd_kernel"
+      ],
+      "tests": []
+    },
+    {
+      "consumer_count": 0,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [],
+      "file": "fla/ops/utils/matmul.py",
+      "id": "utils.matmul",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "matmul_kernel",
+        "leaky_relu",
+        "sigmoid",
+        "tanh",
+        "relu"
+      ],
+      "tests": []
+    },
+    {
+      "consumer_count": 76,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [
+        "fla/ops/abc/chunk.py",
+        "fla/ops/attn/decoding.py",
+        "fla/ops/attn/parallel.py",
+        "fla/ops/attnres/fused.py",
+        "fla/ops/comba/fused_recurrent.py",
+        "fla/ops/comba/wy_fast.py",
+        "fla/ops/common/backends/triton_ascend/chunk_delta_h.py",
+        "fla/ops/common/backends/triton_ascend/chunk_o.py",
+        "fla/ops/common/backends/triton_ascend/chunk_scaled_dot_kkt.py",
+        "fla/ops/common/chunk_delta_h.py",
+        "fla/ops/common/chunk_h.py",
+        "fla/ops/common/chunk_h_parallel.py",
+        "fla/ops/common/chunk_h_split.py",
+        "fla/ops/common/chunk_o.py",
+        "fla/ops/common/chunk_scaled_dot_kkt.py",
+        "fla/ops/common/fused_chunk.py",
+        "fla/ops/common/fused_recurrent.py",
+        "fla/ops/cp/chunk_delta_h.py",
+        "fla/ops/delta_rule/wy_fast.py",
+        "fla/ops/gated_delta_product/chunk_deltaproduct_h.py",
+        "fla/ops/gated_delta_product/chunk_deltaproduct_o.py",
+        "fla/ops/gated_delta_rule/backends/triton_ascend/gate.py",
+        "fla/ops/gated_delta_rule/backends/triton_ascend/wy_fast.py",
+        "fla/ops/gated_delta_rule/chunk_fwd.py",
+        "fla/ops/gated_delta_rule/fused_recurrent.py",
+        "fla/ops/gated_delta_rule/gate.py",
+        "fla/ops/gated_delta_rule/wy_fast.py",
+        "fla/ops/gated_oja_rule/chunk_h.py",
+        "fla/ops/gated_oja_rule/chunk_kkt.py",
+        "fla/ops/gated_oja_rule/chunk_o.py",
+        "fla/ops/gated_oja_rule/fused_recurrent.py",
+        "fla/ops/gated_oja_rule/wy_fast.py",
+        "fla/ops/gdn2/chunk_bwd.py",
+        "fla/ops/gdn2/chunk_intra.py",
+        "fla/ops/gdn2/chunk_intra_token_parallel.py",
+        "fla/ops/gdn2/fused_recurrent.py",
+        "fla/ops/gdn2/wy_fast.py",
+        "fla/ops/generalized_delta_rule/dplr/chunk_A_bwd.py",
+        "fla/ops/generalized_delta_rule/dplr/chunk_A_fwd.py",
+        "fla/ops/generalized_delta_rule/dplr/chunk_h_bwd.py",
+        "fla/ops/generalized_delta_rule/dplr/chunk_h_fwd.py",
+        "fla/ops/generalized_delta_rule/dplr/chunk_o_bwd.py",
+        "fla/ops/generalized_delta_rule/dplr/fused_recurrent.py",
+        "fla/ops/generalized_delta_rule/dplr/wy_fast_fwd.py",
+        "fla/ops/gla/chunk.py",
+        "fla/ops/gsa/chunk.py",
+        "fla/ops/gsa/fused_recurrent.py",
+        "fla/ops/hgrn/chunk.py",
+        "fla/ops/hgrn/fused_recurrent.py",
+        "fla/ops/kda/chunk_bwd.py",
+        "fla/ops/kda/chunk_intra.py",
+        "fla/ops/kda/chunk_intra_token_parallel.py",
+        "fla/ops/kda/fused_recurrent.py",
+        "fla/ops/kda/gate.py",
+        "fla/ops/kda/wy_fast.py",
+        "fla/ops/log_linear_attn/chunk.py",
+        "fla/ops/mesa_net/chunk_cg_solver_bwd.py",
+        "fla/ops/mesa_net/chunk_cg_solver_fwd.py",
+        "fla/ops/mesa_net/chunk_h_fwd.py",
+        "fla/ops/mesa_net/chunk_h_kk_intra_bwd.py",
+        "fla/ops/mesa_net/chunk_h_kv_intra_bwd.py",
+        "fla/ops/mesa_net/chunk_h_kv_intra_bwd_separate.py",
+        "fla/ops/mesa_net/decoding_one_step.py",
+        "fla/ops/nsa/compression.py",
+        "fla/ops/nsa/parallel.py",
+        "fla/ops/nsa/utils.py",
+        "fla/ops/parallax/decode.py",
+        "fla/ops/parallax/parallel.py",
+        "fla/ops/path_attn/parallel_path_bwd_inter_dqh.py",
+        "fla/ops/rwkv4/fused_recurrent.py",
+        "fla/ops/rwkv6/chunk.py",
+        "fla/ops/rwkv6/fused_recurrent.py",
+        "fla/ops/rwkv7/fused_recurrent.py",
+        "fla/ops/simple_gla/parallel.py",
+        "fla/ops/wall_attn/decode.py",
+        "fla/ops/wall_attn/parallel.py"
+      ],
+      "file": "fla/ops/utils/op.py",
+      "id": "utils.op",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "exp",
+        "exp2",
+        "log",
+        "log2",
+        "tanh",
+        "exp",
+        "exp2",
+        "log",
+        "log2",
+        "tanh",
+        "safe_dot",
+        "safe_dot",
+        "gather",
+        "make_tensor_descriptor"
+      ],
+      "tests": []
+    },
+    {
+      "consumer_count": 0,
+      "conversion": {
+        "cute_files": [
+          "fla/ops/backends/cute/pack.py"
+        ],
+        "status": "present_unverified"
+      },
+      "direct_consumers": [],
+      "file": "fla/ops/utils/pack.py",
+      "id": "utils.pack",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "packunpack_sequence_kernel"
+      ],
+      "tests": [
+        "tests/ops/utils/test_pack.py"
+      ]
+    },
+    {
+      "consumer_count": 2,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [
+        "fla/ops/nsa/naive.py",
+        "fla/ops/nsa/parallel.py"
+      ],
+      "file": "fla/ops/utils/pooling.py",
+      "id": "utils.pooling",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "mean_pooling_fwd_kernel",
+        "mean_pooling_bwd_kernel"
+      ],
+      "tests": [
+        "tests/ops/test_nsa.py"
+      ]
+    },
+    {
+      "consumer_count": 1,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [
+        "fla/ops/gsa/chunk.py"
+      ],
+      "file": "fla/ops/utils/softmax.py",
+      "id": "utils.softmax",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "softmax_fwd_kernel",
+        "softmax_bwd_kernel"
+      ],
+      "tests": []
+    },
+    {
+      "consumer_count": 6,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [
+        "fla/ops/gated_delta_rule/backends/triton_ascend/gate.py",
+        "fla/ops/gated_delta_rule/fused_recurrent.py",
+        "fla/ops/gated_delta_rule/gate.py",
+        "fla/ops/gdn2/fused_recurrent.py",
+        "fla/ops/kda/fused_recurrent.py",
+        "fla/ops/kda/gate.py"
+      ],
+      "file": "fla/ops/utils/softplus.py",
+      "id": "utils.softplus",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "softplus_nv",
+        "softplus_triton",
+        "softplus2_nv",
+        "softplus2_triton"
+      ],
+      "tests": []
+    },
+    {
+      "consumer_count": 2,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [
+        "fla/ops/delta_rule/wy_fast.py",
+        "fla/ops/path_attn/parallel.py"
+      ],
+      "file": "fla/ops/utils/solve_tril.py",
+      "id": "utils.solve_tril",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "solve_tril_16x16_kernel",
+        "merge_16x16_to_32x32_inverse_kernel",
+        "merge_16x16_to_64x64_inverse_kernel"
+      ],
+      "tests": [
+        "tests/ops/test_solve_tril.py"
+      ]
+    },
+    {
+      "consumer_count": 5,
+      "conversion": {
+        "cute_files": [],
+        "status": "missing"
+      },
+      "direct_consumers": [
+        "fla/ops/common/intracard_cp.py",
+        "fla/ops/gated_delta_rule/chunk.py",
+        "fla/ops/generalized_delta_rule/dplr/chunk.py",
+        "fla/ops/kda/chunk_bwd.py",
+        "fla/ops/kda/chunk_fwd.py"
+      ],
+      "file": "fla/ops/cp/chunk_delta_h.py",
+      "id": "cp.chunk_delta_h",
+      "implementation_backends": [
+        "triton"
+      ],
+      "kernel_symbols": [
+        "pre_process_fwd_kernel_merged",
+        "merge_fwd_bwd_kernel",
+        "pre_process_bwd_kernel_merged"
+      ],
+      "tests": [
+        "tests/context_parallel/test_cp_bwd_gk_offset.py"
+      ]
+    }
+  ],
+  "summary": {
+    "benchmark_gaps": 49,
+    "benchmark_registered": 16,
+    "cute_public_missing": 65,
+    "cute_public_present_unverified": 0,
+    "cute_shared_missing": 30,
+    "cute_shared_present_unverified": 1,
+    "domain_test_gaps": [
+      "abc.chunk_abc",
+      "rebased.parallel_rebased",
+      "rwkv4.fused_recurrent_rwkv4"
+    ],
+    "public_optimized_entry_points": 65,
+    "shared_kernel_files": 31,
+    "symbol_test_gaps": [
+      "abc.chunk_abc",
+      "delta_rule.fused_chunk_delta_rule",
+      "gated_delta_rule.chunk_gdn",
+      "gated_delta_rule.fused_recurrent_gdn",
+      "gla.fused_chunk_gla",
+      "path_attn.parallel_path_attn",
+      "rebased.parallel_rebased",
+      "rwkv4.fused_recurrent_rwkv4",
+      "rwkv7.fused_recurrent_rwkv7"
+    ]
+  }
+}
