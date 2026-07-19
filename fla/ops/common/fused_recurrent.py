@@ -424,7 +424,7 @@ def fused_recurrent_fwd(
         cu_seqlens is None
         and not reverse
         and not state_v_first
-        and g_gamma is None
+        and not (g is not None and g_gamma is not None)
         and gk is None
         and gv is None
         and K <= 64
@@ -450,6 +450,15 @@ def fused_recurrent_fwd(
             )
         )
         and (
+            g_gamma is None
+            or (
+                g_gamma.shape == (H,)
+                and g_gamma.device == q.device
+                and g_gamma.is_contiguous()
+                and g_gamma.dtype in (torch.float16, torch.bfloat16, torch.float32)
+            )
+        )
+        and (
             initial_state is None
             or (
                 initial_state.shape == (B, H, K, V)
@@ -468,6 +477,7 @@ def fused_recurrent_fwd(
             k=k,
             v=v,
             g=g,
+            g_gamma=g_gamma,
             scale=scale,
             initial_state=initial_state,
             output_final_state=output_final_state,

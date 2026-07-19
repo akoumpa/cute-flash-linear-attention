@@ -26,6 +26,7 @@ def _compile_fused_recurrent_fwd(
     V: int,
     *,
     use_gate: bool,
+    use_gate_gamma: bool,
     use_initial_state: bool,
     store_final_state: bool,
 ):
@@ -84,8 +85,12 @@ def _compile_fused_recurrent_fwd(
                     token = (Int64(batch) * T + pos) * H + head
                     qk_base = token * K
                     v_base = token * V
-                    decay = Float32(mG[token]) if const_expr(use_gate) else Float32(0.0)
-                    decay = cute.math.exp(decay, fastmath=False) if const_expr(use_gate) else Float32(1.0)
+                    decay = (
+                        Float32(mG[token])
+                        if const_expr(use_gate)
+                        else (Float32(mG[head]) if const_expr(use_gate_gamma) else Float32(0.0))
+                    )
+                    decay = cute.math.exp(decay, fastmath=False) if const_expr(use_gate or use_gate_gamma) else Float32(1.0)
                     value = Float32(mV[v_base + v_idx])
                     output = Float32(0.0)
 
@@ -105,7 +110,9 @@ def _compile_fused_recurrent_fwd(
     k_fake = cute.runtime.make_fake_tensor(input_dtype, (cute.sym_int(),), stride=(1,), assumed_align=16)
     v_fake = cute.runtime.make_fake_tensor(input_dtype, (cute.sym_int(),), stride=(1,), assumed_align=16)
     gate_fake = (
-        cute.runtime.make_fake_tensor(gate_dtype, (cute.sym_int(),), stride=(1,), assumed_align=16) if use_gate else None
+        cute.runtime.make_fake_tensor(gate_dtype, (cute.sym_int(),), stride=(1,), assumed_align=16)
+        if use_gate or use_gate_gamma
+        else None
     )
     output_fake = cute.runtime.make_fake_tensor(Float32, (cute.sym_int(),), stride=(1,), assumed_align=16)
     state_fake = (
@@ -137,6 +144,7 @@ def fused_recurrent_fwd_cute(
     k: torch.Tensor,
     v: torch.Tensor,
     g: torch.Tensor | None,
+    g_gamma: torch.Tensor | None,
     scale: float,
     initial_state: torch.Tensor | None,
     output_final_state: bool,
@@ -148,10 +156,11 @@ def fused_recurrent_fwd_cute(
     ht = q.new_empty(B, H, K, V, dtype=torch.float32) if output_final_state else None
     compiled = _compile_fused_recurrent_fwd(
         _torch_to_cute_dtype(q.dtype),
-        _torch_to_cute_dtype(g.dtype) if g is not None else None,
+        _torch_to_cute_dtype((g if g is not None else g_gamma).dtype) if g is not None or g_gamma is not None else None,
         K,
         V,
         use_gate=g is not None,
+        use_gate_gamma=g_gamma is not None,
         use_initial_state=initial_state is not None,
         store_final_state=output_final_state,
     )
@@ -159,7 +168,7 @@ def fused_recurrent_fwd_cute(
         q.view(-1),
         k.view(-1),
         v.view(-1),
-        g.view(-1) if g is not None else None,
+        (g if g is not None else g_gamma).view(-1) if g is not None or g_gamma is not None else None,
         o_partial.view(-1),
         initial_state.view(-1) if initial_state is not None else None,
         ht.view(-1) if ht is not None else None,
