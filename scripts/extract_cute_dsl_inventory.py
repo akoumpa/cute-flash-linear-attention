@@ -257,7 +257,11 @@ def _shared_internals(repo_root: Path, test_files: list[Path]) -> list[dict[str,
                     "consumer_count": len(consumers),
                     "tests": _direct_tests(test_files, module, repo_root),
                     "conversion": {
-                        "status": "present_unverified" if cute_files else "missing",
+                        "status": (
+                            "not_applicable_platform"
+                            if is_platform_backend
+                            else ("present_unverified" if cute_files else "missing")
+                        ),
                         "cute_files": cute_files,
                     },
                 }
@@ -287,6 +291,7 @@ def build_manifest(repo_root: Path) -> dict[str, Any]:
             "reference_exclusions": "symbols imported from naive.py or prefixed naive_",
             "helper_exclusions": ["wall_attn.build_wall_kv_cache"],
             "shared_definition": "kernel-bearing Python files under fla/ops/common, fla/ops/utils, and fla/ops/cp",
+            "platform_exclusions": "TileLang and triton_ascend backend files are not CUDA CuTe migration targets",
         },
         "public_ops": public_ops,
         "shared_internals": shared_internals,

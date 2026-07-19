@@ -3346,6 +3346,7 @@
     "helper_exclusions": [
       "wall_attn.build_wall_kv_cache"
     ],
+    "platform_exclusions": "TileLang and triton_ascend backend files are not CUDA CuTe migration targets",
     "public_definition": "optimized symbols in operator subpackage __all__ exports",
     "reference_exclusions": "symbols imported from naive.py or prefixed naive_",
     "shared_definition": "kernel-bearing Python files under fla/ops/common, fla/ops/utils, and fla/ops/cp"
@@ -3355,7 +3356,7 @@
       "consumer_count": 0,
       "conversion": {
         "cute_files": [],
-        "status": "missing"
+        "status": "not_applicable_platform"
       },
       "direct_consumers": [],
       "file": "fla/ops/common/backends/tilelang/chunk_bwd.py",
@@ -3373,7 +3374,7 @@
       "consumer_count": 0,
       "conversion": {
         "cute_files": [],
-        "status": "missing"
+        "status": "not_applicable_platform"
       },
       "direct_consumers": [],
       "file": "fla/ops/common/backends/tilelang/parallel_attn_bwd.py",
@@ -3391,7 +3392,7 @@
       "consumer_count": 0,
       "conversion": {
         "cute_files": [],
-        "status": "missing"
+        "status": "not_applicable_platform"
       },
       "direct_consumers": [],
       "file": "fla/ops/common/backends/tilelang/parallel_attn_fwd.py",
@@ -3409,7 +3410,7 @@
       "consumer_count": 0,
       "conversion": {
         "cute_files": [],
-        "status": "missing"
+        "status": "not_applicable_platform"
       },
       "direct_consumers": [],
       "file": "fla/ops/common/backends/triton_ascend/chunk_delta_h.py",
@@ -3427,7 +3428,7 @@
       "consumer_count": 0,
       "conversion": {
         "cute_files": [],
-        "status": "missing"
+        "status": "not_applicable_platform"
       },
       "direct_consumers": [],
       "file": "fla/ops/common/backends/triton_ascend/chunk_o.py",
@@ -3451,7 +3452,7 @@
       "consumer_count": 0,
       "conversion": {
         "cute_files": [],
-        "status": "missing"
+        "status": "not_applicable_platform"
       },
       "direct_consumers": [],
       "file": "fla/ops/common/backends/triton_ascend/chunk_scaled_dot_kkt.py",
@@ -3468,7 +3469,7 @@
       "consumer_count": 0,
       "conversion": {
         "cute_files": [],
-        "status": "missing"
+        "status": "not_applicable_platform"
       },
       "direct_consumers": [],
       "file": "fla/ops/common/backends/triton_ascend/gate.py",
@@ -3584,8 +3585,10 @@
     {
       "consumer_count": 4,
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/chunk_o.py"
+        ],
+        "status": "present_unverified"
       },
       "direct_consumers": [
         "fla/ops/comba/chunk.py",
@@ -3706,7 +3709,7 @@
       "consumer_count": 0,
       "conversion": {
         "cute_files": [],
-        "status": "missing"
+        "status": "not_applicable_platform"
       },
       "direct_consumers": [],
       "file": "fla/ops/utils/backends/triton_ascend/cumsum.py",
@@ -3726,7 +3729,7 @@
       "consumer_count": 0,
       "conversion": {
         "cute_files": [],
-        "status": "missing"
+        "status": "not_applicable_platform"
       },
       "direct_consumers": [],
       "file": "fla/ops/utils/backends/triton_ascend/solve_tril.py",
@@ -4102,8 +4105,10 @@
     {
       "consumer_count": 2,
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/solve_tril.py"
+        ],
+        "status": "present_unverified"
       },
       "direct_consumers": [
         "fla/ops/delta_rule/wy_fast.py",
@@ -4158,8 +4163,8 @@
     "benchmark_registered": 16,
     "cute_public_missing": 65,
     "cute_public_present_unverified": 0,
-    "cute_shared_missing": 13,
-    "cute_shared_present_unverified": 18,
+    "cute_shared_missing": 2,
+    "cute_shared_present_unverified": 20,
     "domain_test_gaps": [
       "abc.chunk_abc",
       "rebased.parallel_rebased",
