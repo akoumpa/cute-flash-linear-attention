@@ -14,11 +14,8 @@ from fla.utils import autotune_cache_kwargs, tensor_cache
 
 
 @triton.autotune(
-    configs=[
-        triton.Config({}, num_warps=num_warps)
-        for num_warps in [4, 8, 16, 32]
-    ],
-    key=['B'],
+    configs=[triton.Config({}, num_warps=num_warps) for num_warps in [4, 8, 16, 32]],
+    key=["B"],
     **autotune_cache_kwargs,
 )
 @triton.jit
@@ -70,7 +67,7 @@ def prepare_split_cu_seqlens(
     split_size: int | None = None,
     cu_seqlens: torch.LongTensor | None = None,
     dtype: torch.dtype | None = torch.int32,
-    device: torch.device | None = torch.device('cpu'),
+    device: torch.device | None = torch.device("cpu"),
 ) -> torch.LongTensor:
     """Sub-split a (optionally packed) batch along the token axis.
 
@@ -91,20 +88,14 @@ def prepare_split_cu_seqlens(
         raise TypeError("prepare_split_cu_seqlens() requires `split_size`")
     if cu_seqlens is None:
         if batch_size is None or seq_len is None:
-            raise TypeError(
-                "prepare_split_cu_seqlens() requires either `cu_seqlens`, "
-                "or both `batch_size` and `seq_len`"
-            )
+            raise TypeError("prepare_split_cu_seqlens() requires either `cu_seqlens`, or both `batch_size` and `seq_len`")
         total_tokens = batch_size * seq_len
         cu_seqlens = list(range(0, total_tokens, seq_len)) + [total_tokens]
     else:
         cu_seqlens = cu_seqlens.tolist()
     return torch.tensor(
-        [
-            i
-            for bos, eos in zip(cu_seqlens[:-1], cu_seqlens[1:], strict=False)
-            for i in range(bos, eos, split_size)
-        ] + [cu_seqlens[-1]],
+        [i for bos, eos in zip(cu_seqlens[:-1], cu_seqlens[1:], strict=False) for i in range(bos, eos, split_size)]
+        + [cu_seqlens[-1]],
         dtype=dtype,
         device=device,
     )
@@ -136,6 +127,19 @@ def _segmented_arange(counts: torch.LongTensor) -> tuple[torch.LongTensor, torch
 
 @tensor_cache
 def prepare_position_ids(cu_seqlens: torch.LongTensor, cu_seqlens_cpu: torch.LongTensor | None = None) -> torch.LongTensor:
+    if (
+        cu_seqlens_cpu is None
+        and not torch.compiler.is_compiling()
+        and cu_seqlens.is_cuda
+        and cu_seqlens.is_contiguous()
+        and cu_seqlens.dtype in (torch.int32, torch.int64)
+    ):
+        from fla.ops.backends.cute import is_cute_dsl_available
+
+        if is_cute_dsl_available():
+            from fla.ops.backends.cute.index import prepare_position_ids_cute
+
+            return prepare_position_ids_cute(cu_seqlens)
     src = cu_seqlens_cpu if cu_seqlens_cpu is not None else cu_seqlens
     _, position_ids = _segmented_arange(prepare_lens(src))
     return position_ids.to(cu_seqlens)
@@ -159,7 +163,7 @@ def prepare_chunk_indices(
     cu_seqlens_cpu: torch.LongTensor | None = None,
 ) -> torch.LongTensor:
     src = cu_seqlens_cpu if cu_seqlens_cpu is not None else cu_seqlens
-    chunk_counts = (prepare_lens(src) + (chunk_size - 1)).div(chunk_size, rounding_mode='floor')
+    chunk_counts = (prepare_lens(src) + (chunk_size - 1)).div(chunk_size, rounding_mode="floor")
     seg_id, intra_chunk_idx = _segmented_arange(chunk_counts)
     return torch.stack([seg_id, intra_chunk_idx], 1).to(cu_seqlens)
 
@@ -173,11 +177,7 @@ def prepare_chunk_offsets(
 
 
 @tensor_cache
-def get_max_num_splits(
-    cu_seqlens: torch.LongTensor,
-    chunk_size: int,
-    cu_seqlens_cpu: torch.LongTensor | None = None
-) -> int:
+def get_max_num_splits(cu_seqlens: torch.LongTensor, chunk_size: int, cu_seqlens_cpu: torch.LongTensor | None = None) -> int:
     if cu_seqlens_cpu is not None:
         return triton.cdiv(int(max(prepare_lens(cu_seqlens_cpu))), chunk_size)
     return triton.cdiv(int(max(prepare_lens(cu_seqlens))), chunk_size)

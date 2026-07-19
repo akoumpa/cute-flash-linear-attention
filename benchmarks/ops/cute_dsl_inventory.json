@@ -3787,8 +3787,10 @@
     {
       "consumer_count": 11,
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/index.py"
+        ],
+        "status": "present_unverified"
       },
       "direct_consumers": [
         "fla/ops/comba/utils.py",
@@ -4128,8 +4130,8 @@
     "benchmark_registered": 16,
     "cute_public_missing": 65,
     "cute_public_present_unverified": 0,
-    "cute_shared_missing": 28,
-    "cute_shared_present_unverified": 3,
+    "cute_shared_missing": 27,
+    "cute_shared_present_unverified": 4,
     "domain_test_gaps": [
       "abc.chunk_abc",
       "rebased.parallel_rebased",
