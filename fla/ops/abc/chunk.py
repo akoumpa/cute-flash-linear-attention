@@ -15,6 +15,38 @@ from fla.ops.utils.op import exp
 from fla.utils import input_guard
 
 
+def _can_use_cute_abc_decode(q, k, v, s, initial_state, output_final_state):
+    """Select the fused cached-decoding path; training and prefill stay on Triton."""
+    if (
+        torch.compiler.is_compiling()
+        or initial_state is None
+        or not isinstance(initial_state, tuple | list)
+        or not output_final_state
+        or len(initial_state) != 2
+        or q.ndim != 4
+        or q.shape != k.shape
+        or q.shape[:3] != v.shape[:3]
+        or q.shape[:3] != s.shape[:3]
+        or q.shape[1] != 1
+        or q.dtype not in (torch.float16, torch.bfloat16)
+        or any(x.dtype != q.dtype for x in (k, v, s))
+        or any(x.requires_grad for x in (q, k, v, s, *initial_state))
+        or any(not x.is_cuda or x.device != q.device or not x.is_contiguous() for x in (q, k, v, s, *initial_state))
+    ):
+        return False
+    B, _, H, K = q.shape
+    M, V = s.shape[-1], v.shape[-1]
+    if B * H < 8 or K not in (32, 64) or M != 64 or V not in (64, 128):
+        return False
+    if initial_state[0].dtype != torch.float32 or initial_state[1].dtype != torch.float32:
+        return False
+    if initial_state[0].shape != (B, H, K, M) or initial_state[1].shape != (B, H, M, V):
+        return False
+    from fla.ops.backends.cute.runtime import is_cute_dsl_available
+
+    return is_cute_dsl_available()
+
+
 @triton.jit(do_not_specialize=["T"])
 def chunk_abc_fwd_kernel_h(
     k,
@@ -38,25 +70,28 @@ def chunk_abc_fwd_kernel_h(
 
     b_h = tl.zeros([BK, BV], dtype=tl.float32)
     if USE_INITIAL_STATE:
-        p_h = tl.make_block_ptr(h0 + i_bh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
-        b_h += tl.load(p_h, boundary_check=(0, 1)).to(tl.float32)
+        p_h0 = tl.make_block_ptr(h0 + i_bh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        b_h += tl.load(p_h0, boundary_check=(0, 1)).to(tl.float32)
     if NORMK:
         p_z0 = tl.make_block_ptr(z + i_bh * T * K, (T * K,), (1,), (i_k * BK,), (BK,), (0,))
     else:
         p_z0 = tl.make_block_ptr(z + i_bh * T * V, (T * V,), (1,), (i_v * BV,), (BV,), (0,))
     b_zp = tl.load(p_z0).to(tl.float32)
     for i_t in range(NT):
+        i_chunk_end = tl.minimum((i_t + 1) * BT, T) - 1
         p_k = tl.make_block_ptr(k + i_bh * T * K, (K, T), (1, K), (i_k * BK, i_t * BT), (BK, BT), (0, 1))
         p_v = tl.make_block_ptr(v + i_bh * T * V, (T, V), (V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
-        p_h = tl.make_block_ptr(h + i_bh * NT * K * V + i_t * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        p_h_out = tl.make_block_ptr(
+            h + i_bh * NT * K * V + i_t * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0)
+        )
 
-        tl.store(p_h, b_h.to(p_h.dtype.element_ty), boundary_check=(0, 1))
+        tl.store(p_h_out, b_h.to(p_h_out.dtype.element_ty), boundary_check=(0, 1))
         # [BK, BT]
         b_k = tl.load(p_k, boundary_check=(0, 1))
         # [BT, BV]
         b_v = tl.load(p_v, boundary_check=(0, 1))
         if NORMK:
-            p_zc = tl.make_block_ptr(z + i_bh * T * K, (T * K,), (1,), ((i_t * BT + BT - 1) * K + i_k * BK,), (BK,), (0,))
+            p_zc = tl.make_block_ptr(z + i_bh * T * K, (T * K,), (1,), (i_chunk_end * K + i_k * BK,), (BK,), (0,))
             # [BK,]
             b_zc = tl.load(p_zc, boundary_check=(0,))
             b_r, b_zp = exp(b_zp - b_zc), b_zc
@@ -64,7 +99,7 @@ def chunk_abc_fwd_kernel_h(
             b_h = b_h * b_r[:, None]
             b_k = exp(b_k - b_zc[:, None]).to(b_k.dtype)
         else:
-            p_zc = tl.make_block_ptr(z + i_bh * T * V, (T * V,), (1,), ((i_t * BT + BT - 1) * V + i_v * BV,), (BV,), (0,))
+            p_zc = tl.make_block_ptr(z + i_bh * T * V, (T * V,), (1,), (i_chunk_end * V + i_v * BV,), (BV,), (0,))
             # [BV,]
             b_zc = tl.load(p_zc, boundary_check=(0,))
             b_r, b_zp = exp(b_zp - b_zc), b_zc
@@ -75,8 +110,8 @@ def chunk_abc_fwd_kernel_h(
         b_h += tl.dot(b_k, b_v, allow_tf32=False)
 
     if STORE_FINAL_STATE:
-        p_h = tl.make_block_ptr(ht + i_bh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
-        tl.store(p_h, b_h.to(p_h.dtype.element_ty), boundary_check=(0, 1))
+        p_ht = tl.make_block_ptr(ht + i_bh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        tl.store(p_ht, b_h.to(p_ht.dtype.element_ty), boundary_check=(0, 1))
 
 
 @triton.jit(do_not_specialize=["T"])
@@ -1275,6 +1310,10 @@ def chunk_abc(
         final_state (torch.Tensor):
             Final state of shape `[B, H, K, M]` and `[B, H, M, V]` if `output_final_state=True` else `None`.
     """
+    if not head_first and _can_use_cute_abc_decode(q, k, v, s, initial_state, output_final_state):
+        from fla.ops.backends.cute.abc import abc_decode_cute
+
+        return abc_decode_cute(q, k, v, s, initial_state)
     if not head_first:
         q, k, v, s = map(lambda x: x.transpose(1, 2), (q, k, v, s))
     o, final_state = ChunkABCFunction.apply(q, k, v, s, initial_state, output_final_state)
