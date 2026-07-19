@@ -15,42 +15,6 @@ from fla.ops.utils import prepare_chunk_indices, prepare_chunk_offsets
 from fla.utils import autocast_custom_bwd, autocast_custom_fwd, autotune_cache_kwargs, input_guard
 
 
-def _can_use_cute_ttt_linear_fwd_o(
-    q: torch.Tensor,
-    k: torch.Tensor,
-    v: torch.Tensor,
-    eta: torch.Tensor,
-    h: torch.Tensor,
-    hb: torch.Tensor,
-    scale: float,
-    cu_seqlens: torch.LongTensor | None,
-    chunk_indices: torch.LongTensor | None,
-    chunk_size: int,
-) -> bool:
-    if (
-        torch.compiler.is_compiling()
-        or cu_seqlens is not None
-        or chunk_indices is not None
-        or q.shape != (1, 63, 1, 64)
-        or k.shape != q.shape
-        or v.shape != q.shape
-        or eta.shape != (1, 63, 1, 1)
-        or h.shape != (1, 4, 1, 64, 64)
-        or hb.shape != (1, 4, 1, 1, 64)
-        or q.dtype != torch.float16
-        or not (q.dtype == k.dtype == v.dtype == eta.dtype == h.dtype == hb.dtype)
-        or not q.is_cuda
-        or not (q.device == k.device == v.device == eta.device == h.device == hb.device)
-        or not all(tensor.is_contiguous() for tensor in (q, k, v, eta, h, hb))
-        or chunk_size != 16
-        or not isinstance(scale, int | float)
-    ):
-        return False
-    from fla.ops.backends.cute.runtime import is_cute_dsl_available
-
-    return is_cute_dsl_available()
-
-
 @triton.heuristics(
     {
         "USE_INITIAL_STATE": lambda args: args["h0"] is not None,
@@ -819,11 +783,6 @@ def chunk_ttt_linear_fwd_o(
     if scale is None:
         scale = k.shape[-1] ** -0.5
     BT = chunk_size
-
-    if _can_use_cute_ttt_linear_fwd_o(q, k, v, eta, h, hb, scale, cu_seqlens, chunk_indices, chunk_size):
-        from fla.ops.backends.cute.ttt import ttt_linear_fwd_o_cute
-
-        return ttt_linear_fwd_o_cute(q=q, k=k, v=v, eta=eta, h=h, hb=hb, scale=scale)
 
     if chunk_indices is None and cu_seqlens is not None:
         chunk_indices = prepare_chunk_indices(cu_seqlens, BT)

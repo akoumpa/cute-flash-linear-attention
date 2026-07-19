@@ -28,6 +28,11 @@ SHARED_NAMESPACES = ("common", "utils", "cp")
 # missing entry is intentionally not a migration target, while `conversion`
 # continues to report only what exists in the source tree.
 MIGRATION_DECISIONS: dict[str, dict[str, str]] = {
+    "attn.parallel_attn": {
+        "status": "no_go",
+        "reason": "Corrected raw-op timing and EOS NCU both show the four-CTA CuTe candidate slower than the established backend.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:78",
+    },
     "attnres.fused_attnres": {
         "status": "no_go",
         "reason": "The fused vector-reduction candidate was substantially slower across representative rows and widths.",
@@ -137,6 +142,11 @@ MIGRATION_DECISIONS: dict[str, dict[str, str]] = {
         "status": "no_go",
         "reason": "Splitting its persistent fused recurrence would materialize chunk states and add substantial traffic.",
         "source": "profile/cute-dsl-migration/OPT_LOG.md:72",
+    },
+    "ttt.chunk_ttt_linear": {
+        "status": "no_go",
+        "reason": "EOS NCU showed the CuTe output kernel was 2.77x slower, and the corrected end-to-end benchmark regressed with final state.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:77",
     },
     "wall_attn.parallel_wall_attn_decode": {
         "status": "no_go",

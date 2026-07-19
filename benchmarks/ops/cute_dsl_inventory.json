@@ -244,12 +244,10 @@
         "parallel_attn"
       ],
       "conversion": {
-        "cute_files": [
-          "fla/ops/backends/cute/parallel_attn.py"
-        ],
-        "status": "present_unverified"
+        "cute_files": [],
+        "status": "missing"
       },
-      "coverage_status": "present_unverified",
+      "coverage_status": "no_go",
       "domain": "attn",
       "domain_test_present": true,
       "domain_tests": [
@@ -277,7 +275,11 @@
       "implementation_backends": [
         "triton"
       ],
-      "migration_decision": null,
+      "migration_decision": {
+        "reason": "Corrected raw-op timing and EOS NCU both show the four-CTA CuTe candidate slower than the established backend.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:78",
+        "status": "no_go"
+      },
       "shared_dependencies": [
         "common.backends.tilelang",
         "utils",
@@ -788,8 +790,7 @@
       "benchmark_targets": [],
       "conversion": {
         "cute_files": [
-          "fla/ops/backends/cute/forgetting_attn.py",
-          "fla/ops/backends/cute/parallel_attn.py"
+          "fla/ops/backends/cute/forgetting_attn.py"
         ],
         "status": "present_unverified"
       },
@@ -2665,7 +2666,6 @@
       "benchmark_targets": [],
       "conversion": {
         "cute_files": [
-          "fla/ops/backends/cute/parallel_attn.py",
           "fla/ops/backends/cute/path_attn.py",
           "fla/ops/backends/cute/solve_tril.py"
         ],
@@ -3500,12 +3500,10 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [
-          "fla/ops/backends/cute/ttt.py"
-        ],
-        "status": "present_unverified"
+        "cute_files": [],
+        "status": "missing"
       },
-      "coverage_status": "present_unverified",
+      "coverage_status": "no_go",
       "domain": "ttt",
       "domain_test_present": true,
       "domain_tests": [
@@ -3531,7 +3529,11 @@
       "implementation_backends": [
         "triton"
       ],
-      "migration_decision": null,
+      "migration_decision": {
+        "reason": "EOS NCU showed the CuTe output kernel was 2.77x slower, and the corrected end-to-end benchmark regressed with final state.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:77",
+        "status": "no_go"
+      },
       "shared_dependencies": [
         "utils"
       ],
@@ -4593,8 +4595,8 @@
   "summary": {
     "benchmark_gaps": 49,
     "benchmark_registered": 16,
-    "cute_public_missing": 20,
-    "cute_public_present_unverified": 45,
+    "cute_public_missing": 22,
+    "cute_public_present_unverified": 43,
     "cute_shared_missing": 2,
     "cute_shared_present_unverified": 20,
     "domain_test_gaps": [
@@ -4603,11 +4605,11 @@
       "rwkv4.fused_recurrent_rwkv4"
     ],
     "migration_decision_deprecated": 2,
-    "migration_decision_no_go": 22,
+    "migration_decision_no_go": 24,
     "public_coverage_deprecated": 2,
     "public_coverage_missing": 0,
-    "public_coverage_no_go": 18,
-    "public_coverage_present_unverified": 45,
+    "public_coverage_no_go": 20,
+    "public_coverage_present_unverified": 43,
     "public_optimized_entry_points": 65,
     "shared_coverage_deprecated": 0,
     "shared_coverage_missing": 0,

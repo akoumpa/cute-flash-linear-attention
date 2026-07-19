@@ -143,12 +143,10 @@ def _compile_ttt_linear_fwd_o(input_dtype, T: int, H: int):
 
             state = (Int64(batch) * NT + chunk) * H + head
             state_base = state * _HEAD_DIM * _HEAD_DIM
-            linear = tidx
-            for _ in cutlass.range_constexpr((_HEAD_DIM * _HEAD_DIM) // _NUM_THREADS):
-                value = linear // _HEAD_DIM
-                key = linear % _HEAD_DIM
-                sH[value, key] = mH[state_base + key * _HEAD_DIM + value]
-                linear += _NUM_THREADS
+            for linear in cutlass.range(tidx, _HEAD_DIM * _HEAD_DIM, _NUM_THREADS, unroll=1):
+                value_idx = linear // _HEAD_DIM
+                key_idx = linear % _HEAD_DIM
+                sH[value_idx, key_idx] = mH[state_base + key_idx * _HEAD_DIM + value_idx]
 
             linear = tidx
             for _ in cutlass.range_constexpr((_HEAD_DIM * _CHUNK_SIZE) // _NUM_THREADS):

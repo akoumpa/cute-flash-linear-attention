@@ -18,31 +18,6 @@ from fla.ops.utils.op import exp2, log2
 from fla.utils import autocast_custom_bwd, autocast_custom_fwd, check_shared_mem, contiguous
 
 
-def _can_use_cute_parallel_attn_fwd(q, k, v, g_cumsum, sink_bias, scale, window_size, cu_seqlens):
-    if (
-        not q.is_cuda
-        or q.dtype not in (torch.float16, torch.bfloat16)
-        or q.dtype != k.dtype
-        or q.dtype != v.dtype
-        or q.ndim != 4
-        or q.shape != k.shape
-        or q.shape != v.shape
-        or q.shape[2] < 1
-        or q.shape[1] != 33
-        or q.shape[-1] != 64
-        or g_cumsum is not None
-        or sink_bias is not None
-        or window_size is not None
-        or cu_seqlens is not None
-        or not isinstance(scale, float | int)
-        or any(x.device != q.device or not x.is_contiguous() for x in (q, k, v))
-    ):
-        return False
-    from fla.ops.backends.cute.runtime import is_cute_dsl_available
-
-    return is_cute_dsl_available()
-
-
 @triton.heuristics(
     {
         "USE_G": lambda args: args["g_cumsum"] is not None,
@@ -551,10 +526,6 @@ def parallel_attn_fwd(
     cu_seqlens: torch.LongTensor | None = None,
     chunk_indices: torch.LongTensor | None = None,
 ):
-    if _can_use_cute_parallel_attn_fwd(q, k, v, g_cumsum, sink_bias, scale, window_size, cu_seqlens):
-        from fla.ops.backends.cute.parallel_attn import parallel_attn_fwd_cute
-
-        return parallel_attn_fwd_cute(q, k, v, scale)
     B, T, H, K, V = *k.shape, v.shape[-1]
     HQ = q.shape[2]
     G = HQ // H
