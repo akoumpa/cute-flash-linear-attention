@@ -16,11 +16,8 @@ NUM_WARPS_AUTOTUNE = [1, 2, 4, 8, 16] if IS_AMD else [1, 2, 4, 8, 16, 32]
 
 
 @triton.autotune(
-    configs=[
-        triton.Config({}, num_warps=num_warps)
-        for num_warps in NUM_WARPS_AUTOTUNE
-    ],
-    key=['D'],
+    configs=[triton.Config({}, num_warps=num_warps) for num_warps in NUM_WARPS_AUTOTUNE],
+    key=["D"],
     **autotune_cache_kwargs,
 )
 @triton.jit
@@ -34,7 +31,7 @@ def softmax_fwd_kernel(
     o_d = tl.arange(0, B)
     m_d = o_d < D
 
-    b_x = tl.load(x + i_n * D + o_d, mask=m_d, other=-float('inf'))
+    b_x = tl.load(x + i_n * D + o_d, mask=m_d, other=-float("inf"))
     b_m = tl.max(b_x, 0)
     b_x = exp(b_x - b_m)
     b_p = b_x / tl.sum(b_x, 0)
@@ -43,11 +40,8 @@ def softmax_fwd_kernel(
 
 
 @triton.autotune(
-    configs=[
-        triton.Config({}, num_warps=num_warps)
-        for num_warps in NUM_WARPS_AUTOTUNE
-    ],
-    key=['D'],
+    configs=[triton.Config({}, num_warps=num_warps) for num_warps in NUM_WARPS_AUTOTUNE],
+    key=["D"],
     **autotune_cache_kwargs,
 )
 @triton.jit
@@ -62,8 +56,8 @@ def softmax_bwd_kernel(
     o_d = tl.arange(0, B)
     m_d = o_d < D
 
-    b_p = tl.load(p + i_n * D + o_d, mask=m_d, other=0.)
-    b_dp = tl.load(dp + i_n * D + o_d, mask=m_d, other=0.)
+    b_p = tl.load(p + i_n * D + o_d, mask=m_d, other=0.0)
+    b_dp = tl.load(dp + i_n * D + o_d, mask=m_d, other=0.0)
     b_pp = tl.sum(b_p * b_dp, 0)
     b_ds = b_p * b_dp - b_p * b_pp
     tl.store(ds + i_n * D + o_d, b_ds.to(ds.dtype.element_ty), mask=m_d)
@@ -74,6 +68,21 @@ def softmax_fwd(
     dtype: torch.dtype | None = torch.float,
 ) -> torch.Tensor:
     shape = x.shape
+    output_dtype = dtype or x.dtype
+    if (
+        not torch.compiler.is_compiling()
+        and x.is_cuda
+        and x.is_contiguous()
+        and x.dtype in (torch.float16, torch.bfloat16, torch.float32)
+        and output_dtype in (torch.float16, torch.bfloat16, torch.float32)
+        and 0 < x.shape[-1] <= 1024
+    ):
+        from fla.ops.backends.cute import is_cute_dsl_available
+
+        if is_cute_dsl_available():
+            from fla.ops.backends.cute.softmax import softmax_fwd_cute
+
+            return softmax_fwd_cute(x, output_dtype)
     x = x.view(-1, x.shape[-1])
 
     N, D = x.shape
@@ -95,6 +104,26 @@ def softmax_bwd(
     dtype: torch.dtype | None = torch.float,
 ) -> torch.Tensor:
     shape = p.shape
+    output_dtype = dtype or p.dtype
+    if (
+        not torch.compiler.is_compiling()
+        and p.is_cuda
+        and dp.is_cuda
+        and p.is_contiguous()
+        and dp.is_contiguous()
+        and p.shape == dp.shape
+        and p.device == dp.device
+        and p.dtype in (torch.float16, torch.bfloat16, torch.float32)
+        and dp.dtype in (torch.float16, torch.bfloat16, torch.float32)
+        and output_dtype in (torch.float16, torch.bfloat16, torch.float32)
+        and 0 < p.shape[-1] <= 1024
+    ):
+        from fla.ops.backends.cute import is_cute_dsl_available
+
+        if is_cute_dsl_available():
+            from fla.ops.backends.cute.softmax import softmax_bwd_cute
+
+            return softmax_bwd_cute(p, dp, output_dtype)
     p = p.view(-1, p.shape[-1])
     ds = torch.empty_like(p, dtype=dtype)
 

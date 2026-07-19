@@ -3630,8 +3630,10 @@
     {
       "consumer_count": 1,
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/softmax.py"
+        ],
+        "status": "present_unverified"
       },
       "direct_consumers": [
         "fla/ops/simple_gla/fused_chunk.py"
@@ -4136,8 +4138,8 @@
     "benchmark_registered": 16,
     "cute_public_missing": 65,
     "cute_public_present_unverified": 0,
-    "cute_shared_missing": 24,
-    "cute_shared_present_unverified": 7,
+    "cute_shared_missing": 23,
+    "cute_shared_present_unverified": 8,
     "domain_test_gaps": [
       "abc.chunk_abc",
       "rebased.parallel_rebased",
