@@ -19,6 +19,104 @@ from fla.ops.backends.cute.pack import _torch_to_cute_dtype
 
 
 @cache
+def _compile_dense_scalar_global_cumsum(
+    input_dtype,
+    output_dtype,
+    *,
+    reverse: bool,
+    head_first: bool,
+    has_scale: bool,
+):
+    class DenseScalarGlobalCumsum:
+        @cute.jit
+        def __call__(
+            self,
+            mS: cute.Tensor,
+            mO: cute.Tensor,
+            B: Int32,
+            T: Int32,
+            H: Int32,
+            scale: Float32,
+            stream: cuda.CUstream,
+        ):
+            self.kernel(mS, mO, B, T, H, scale).launch(
+                grid=[B * H, 1, 1],
+                block=[256, 1, 1],
+                stream=stream,
+            )
+
+        @cute.kernel
+        def kernel(
+            self,
+            mS: cute.Tensor,
+            mO: cute.Tensor,
+            B: Int32,
+            T: Int32,
+            H: Int32,
+            scale: Float32,
+        ):
+            tidx, _, _ = cute.arch.thread_idx()
+            block, _, _ = cute.arch.block_idx()
+            batch = block // H
+            head = block - batch * H
+            smem = cutlass.utils.SmemAllocator()
+            sValues = smem.allocate_tensor(
+                Float32,
+                cute.make_layout(256),
+                byte_alignment=16,
+            )
+
+            carry = Float32(0.0)
+            num_tiles = cute.ceil_div(T, 256)
+            for tile in cutlass.range(0, num_tiles, 1, unroll=1):
+                logical_token = tile * 256 + tidx
+                valid = logical_token < T
+                token = T - 1 - logical_token if const_expr(reverse) else logical_token
+                value = Float32(0.0)
+                offset = Int64(0)
+                if valid:
+                    if const_expr(head_first):
+                        offset = Int64(batch * H + head) * T + token
+                    else:
+                        offset = Int64(batch * T + token) * H + head
+                    value = Float32(mS[offset])
+                sValues[tidx] = value
+                cute.arch.sync_threads()
+
+                for scan_offset in (1, 2, 4, 8, 16, 32, 64, 128):
+                    addend = Float32(0.0)
+                    if tidx >= scan_offset:
+                        addend = sValues[tidx - scan_offset]
+                    cute.arch.sync_threads()
+                    if tidx >= scan_offset:
+                        sValues[tidx] = sValues[tidx] + addend
+                    cute.arch.sync_threads()
+
+                tile_total = sValues[255]
+                if valid:
+                    result = sValues[tidx] + carry
+                    if const_expr(has_scale):
+                        result *= scale
+                    mO[offset] = result
+                carry += tile_total
+                cute.arch.sync_threads()
+
+    s_fake = cute.runtime.make_fake_tensor(input_dtype, (cute.sym_int(),), stride=(1,), assumed_align=16)
+    o_fake = cute.runtime.make_fake_tensor(output_dtype, (cute.sym_int(),), stride=(1,), assumed_align=16)
+    return cute.compile(
+        DenseScalarGlobalCumsum(),
+        s_fake,
+        o_fake,
+        Int32(0),
+        Int32(0),
+        Int32(0),
+        Float32(1.0),
+        cute.runtime.make_fake_stream(use_tvm_ffi_env_stream=True),
+        options="--enable-tvm-ffi",
+    )
+
+
+@cache
 def _compile_dense_vector_cumsum(
     input_dtype,
     output_dtype,
@@ -243,6 +341,31 @@ def dense_vector_cumsum_cute(
     return out
 
 
+def dense_scalar_global_cumsum_cute(
+    s: torch.Tensor,
+    *,
+    reverse: bool = False,
+    scale: float | None = None,
+    head_first: bool = False,
+    output_dtype: torch.dtype | None = torch.float,
+) -> torch.Tensor:
+    if head_first:
+        B, H, T = s.shape
+    else:
+        B, T, H = s.shape
+    out_dtype = output_dtype or s.dtype
+    out = torch.empty_like(s, dtype=out_dtype)
+    compiled = _compile_dense_scalar_global_cumsum(
+        _torch_to_cute_dtype(s.dtype),
+        _torch_to_cute_dtype(out_dtype),
+        reverse=reverse,
+        head_first=head_first,
+        has_scale=scale is not None,
+    )
+    compiled(s.view(-1), out.view(-1), B, T, H, 1.0 if scale is None else scale)
+    return out
+
+
 def varlen_local_vector_cumsum_cute(
     s: torch.Tensor,
     cu_seqlens: torch.Tensor,
@@ -282,4 +405,8 @@ def varlen_local_vector_cumsum_cute(
     return out
 
 
-__all__ = ["dense_vector_cumsum_cute", "varlen_local_vector_cumsum_cute"]
+__all__ = [
+    "dense_scalar_global_cumsum_cute",
+    "dense_vector_cumsum_cute",
+    "varlen_local_vector_cumsum_cute",
+]
