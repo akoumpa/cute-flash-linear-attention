@@ -34,7 +34,7 @@ from fla.utils import autotune_cache_kwargs, input_guard
 def _can_use_cute_hgrn(x, g, initial_state):
     if (
         not x.is_cuda
-        or x.dtype not in (torch.float16, torch.bfloat16, torch.float32)
+        or x.dtype != torch.float32
         or x.ndim != 3
         or x.shape != g.shape
         or x.dtype != g.dtype
