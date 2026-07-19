@@ -20,6 +20,60 @@ from fla.ops.utils.softmax import softmax_bwd, softmax_fwd
 from fla.utils import autotune_cache_kwargs, input_guard
 
 
+def _can_use_cute_chunk_gsa(q, k, v, s, g, initial_state, output_final_state, cu_seqlens):
+    """Select the fused one-token inference path; training and prefill stay on Triton."""
+    if (
+        torch.compiler.is_compiling()
+        or torch.is_grad_enabled()
+        or not output_final_state
+        or cu_seqlens is not None
+        or g is None
+        or not q.is_cuda
+        or q.dtype not in (torch.float16, torch.bfloat16)
+        or q.dtype != k.dtype
+        or q.dtype != v.dtype
+        or q.dtype != s.dtype
+        or q.ndim != 4
+        or k.ndim != 4
+        or v.ndim != 4
+        or s.ndim != 4
+    ):
+        return False
+    B, T, HQ, K = q.shape
+    H, V, M = k.shape[2], v.shape[-1], s.shape[-1]
+    if (
+        B < 1
+        or T != 1
+        or H < 1
+        or HQ != H
+        or B * HQ < 4
+        or K != 64
+        or V != 64
+        or M != 32
+        or k.shape != (B, T, H, K)
+        or v.shape != (B, T, H, V)
+        or s.shape != (B, T, H, M)
+        or g.shape != s.shape
+        or g.dtype not in (torch.float16, torch.bfloat16, torch.float32)
+        or q.device != k.device
+        or q.device != v.device
+        or q.device != s.device
+        or q.device != g.device
+        or not q.is_contiguous()
+        or not k.is_contiguous()
+        or not v.is_contiguous()
+        or not s.is_contiguous()
+        or not g.is_contiguous()
+    ):
+        return False
+    hk0, hv0 = initial_state
+    if hk0 is not None or hv0 is not None:
+        return False
+    from fla.ops.backends.cute.runtime import is_cute_dsl_available
+
+    return is_cute_dsl_available()
+
+
 @triton.heuristics({
     'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
 })
@@ -1200,6 +1254,11 @@ def chunk_gsa(
     hk0, hv0 = None, None
     if initial_state is not None:
         hk0, hv0 = initial_state
+    state = (hk0, hv0)
+    if _can_use_cute_chunk_gsa(q, k, v, s, g, state, output_final_state, cu_seqlens):
+        from fla.ops.backends.cute.gsa import gsa_decode_cute
+
+        return gsa_decode_cute(q, k, v, s, g, state, output_final_state, scale)
     o, *final_state = ChunkGSAFunction.apply(
         q,
         k,
