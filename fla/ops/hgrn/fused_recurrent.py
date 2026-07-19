@@ -13,21 +13,48 @@ from fla.ops.utils.op import exp
 from fla.utils import autotune_cache_kwargs, input_guard
 
 
-@triton.heuristics({
-    'USE_INITIAL_STATE': lambda args: args['h0'] is not None,
-    'STORE_FINAL_STATE': lambda args: args['ht'] is not None,
-    'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
-})
+def _can_use_cute_hgrn(x, g, initial_state, cu_seqlens):
+    if (
+        torch.is_grad_enabled()
+        or cu_seqlens is not None
+        or not x.is_cuda
+        or x.dtype != torch.float32
+        or x.ndim != 3
+        or x.shape != g.shape
+        or x.dtype != g.dtype
+        or x.device != g.device
+        or not x.is_contiguous()
+        or not g.is_contiguous()
+    ):
+        return False
+    B, T, D = x.shape
+    if B < 1 or T < 1 or T > 128 or D < 1 or B * D < 256:
+        return False
+    if initial_state is not None and (
+        initial_state.shape != (B, D)
+        or initial_state.dtype != x.dtype
+        or initial_state.device != x.device
+        or not initial_state.is_contiguous()
+    ):
+        return False
+    from fla.ops.backends.cute.runtime import is_cute_dsl_available
+
+    return is_cute_dsl_available()
+
+
+@triton.heuristics(
+    {
+        "USE_INITIAL_STATE": lambda args: args["h0"] is not None,
+        "STORE_FINAL_STATE": lambda args: args["ht"] is not None,
+        "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
+    }
+)
 @triton.autotune(
-    configs=[
-        triton.Config({'BD': BD}, num_warps=num_warps)
-        for BD in [32, 64, 128]
-        for num_warps in [1, 2, 4, 8]
-    ],
-    key=['D'],
+    configs=[triton.Config({"BD": BD}, num_warps=num_warps) for BD in [32, 64, 128] for num_warps in [1, 2, 4, 8]],
+    key=["D"],
     **autotune_cache_kwargs,
 )
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=["T"])
 def fused_recurrent_hgrn_fwd_kernel(
     x,
     g,
@@ -75,21 +102,19 @@ def fused_recurrent_hgrn_fwd_kernel(
         tl.store(p_ht, b_h.to(p_ht.dtype.element_ty), mask=mask)
 
 
-@triton.heuristics({
-    'USE_INITIAL_STATE': lambda args: args['h0'] is not None,
-    'USE_FINAL_STATE_GRADIENT': lambda args: args['dht'] is not None,
-    'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
-})
+@triton.heuristics(
+    {
+        "USE_INITIAL_STATE": lambda args: args["h0"] is not None,
+        "USE_FINAL_STATE_GRADIENT": lambda args: args["dht"] is not None,
+        "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
+    }
+)
 @triton.autotune(
-    configs=[
-        triton.Config({'BD': BD}, num_warps=num_warps)
-        for BD in [32, 64, 128]
-        for num_warps in [1, 2, 4, 8]
-    ],
-    key=['D'],
+    configs=[triton.Config({"BD": BD}, num_warps=num_warps) for BD in [32, 64, 128] for num_warps in [1, 2, 4, 8]],
+    key=["D"],
     **autotune_cache_kwargs,
 )
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=["T"])
 def fused_recurrent_hgrn_bwd_kernel(
     g,
     o,
@@ -169,7 +194,9 @@ def fused_recurrent_hgrn_fwd(
     o = torch.empty_like(x)
     final_state = x.new_empty(N, D) if output_final_state else None
 
-    def grid(meta): return (triton.cdiv(D, meta['BD']), N)
+    def grid(meta):
+        return (triton.cdiv(D, meta["BD"]), N)
+
     fused_recurrent_hgrn_fwd_kernel[grid](
         x=x,
         g=g,
@@ -197,7 +224,10 @@ def fused_recurrent_hgrn_bwd(
     dx = torch.empty_like(o, dtype=torch.float)
     dg = torch.empty_like(g, dtype=torch.float)
     dh0 = torch.empty_like(initial_state, dtype=torch.float) if initial_state is not None else None
-    def grid(meta): return (triton.cdiv(D, meta['BD']), N)
+
+    def grid(meta):
+        return (triton.cdiv(D, meta["BD"]), N)
+
     fused_recurrent_hgrn_bwd_kernel[grid](
         g=g,
         o=o,
@@ -215,7 +245,6 @@ def fused_recurrent_hgrn_bwd(
 
 
 class FusedRecurrentHGRNFunction(torch.autograd.Function):
-
     @staticmethod
     @input_guard
     def forward(
@@ -314,6 +343,10 @@ def fused_recurrent_hgrn(
                 f"The number of initial states is expected to be equal to the number of input sequences, "
                 f"i.e., {len(cu_seqlens) - 1} rather than {initial_state.shape[0]}.",
             )
+    if _can_use_cute_hgrn(x, g, initial_state, cu_seqlens):
+        from fla.ops.backends.cute.hgrn import hgrn_fwd_cute
+
+        return hgrn_fwd_cute(x, g, initial_state, output_final_state)
     return FusedRecurrentHGRNFunction.apply(
         x,
         g,
