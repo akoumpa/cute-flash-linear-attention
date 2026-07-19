@@ -23,6 +23,149 @@ EXPECTED_SHARED_KERNEL_FILES = 31
 INFRASTRUCTURE_DIRS = {"__pycache__", "backends", "common", "cp", "utils"}
 SHARED_NAMESPACES = ("common", "utils", "cp")
 
+# Curated decisions are keyed by the inventory's exact, stable IDs. Keep these
+# separate from factual CuTe detection: a decision explains why an otherwise
+# missing entry is intentionally not a migration target, while `conversion`
+# continues to report only what exists in the source tree.
+MIGRATION_DECISIONS: dict[str, dict[str, str]] = {
+    "attnres.fused_attnres": {
+        "status": "no_go",
+        "reason": "The fused vector-reduction candidate was substantially slower across representative rows and widths.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:45",
+    },
+    "based.fused_chunk_based": {
+        "status": "no_go",
+        "reason": "The aligned four-warp Taylor-state kernel has no removable padding or launch boundary.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:73",
+    },
+    "based.parallel_based": {
+        "status": "no_go",
+        "reason": "The fused streaming kernel beat analogous native-MMA candidates on the representative envelope.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:79",
+    },
+    "comba.fused_recurrent_comba": {
+        "status": "no_go",
+        "reason": "Its dependent FP32 GEMVs and rank-one update have no useful native-MMA row dimension.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:67",
+    },
+    "common.chunk_delta_h": {
+        "status": "no_go",
+        "reason": "The CuTe state-update candidate passed parity but measured 0.13-0.68x across representative work.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:26",
+    },
+    "common.chunk_scaled_dot_kkt": {
+        "status": "no_go",
+        "reason": "The exact native-MMA KKT candidate measured 0.59-0.65x because its separate epilogue launch dominated.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:34",
+    },
+    "delta_rule.fused_chunk_delta_rule": {
+        "status": "deprecated",
+        "reason": "The compatibility symbol unconditionally raises and directs callers to chunk_delta_rule.",
+        "source": "fla/ops/delta_rule/fused_chunk.py:8",
+    },
+    "delta_rule.fused_recurrent_delta_rule": {
+        "status": "no_go",
+        "reason": "The bounded CuTe recurrence passed parity but was substantially slower than the existing fused kernel.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:62",
+    },
+    "deltaformer.deltaformer_attn": {
+        "status": "no_go",
+        "reason": "Exact dense intermediates require a large triangular solve that the current CuTe path cannot consume.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:61",
+    },
+    "gla.chunk_gla": {
+        "status": "no_go",
+        "reason": "Representative shapes already use chunk-parallel tensor-core stages and require a full multiwarp pipeline.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:58",
+    },
+    "gla.fused_chunk_gla": {
+        "status": "deprecated",
+        "reason": "The compatibility symbol unconditionally raises and directs callers to chunk_gla.",
+        "source": "fla/ops/gla/fused_chunk.py:8",
+    },
+    "generalized_delta_rule.chunk_iplr_delta_rule": {
+        "status": "no_go",
+        "reason": "The sequential CuTe recurrence violates the production chunk algorithm's numerical contract.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:66",
+    },
+    "generalized_delta_rule.fused_recurrent_iplr_delta_rule": {
+        "status": "no_go",
+        "reason": "The FP32 CuTe recurrence passed parity but remained slower than the one-launch Triton kernel.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:56",
+    },
+    "kda.chunk_kda": {
+        "status": "no_go",
+        "reason": "Representative execution is an end-to-end multi-stage chunk pipeline, not a replaceable recurrence slice.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:59",
+    },
+    "mesa_net.mesa_net_decoding_one_step": {
+        "status": "no_go",
+        "reason": "The required shared state and cooperative reductions made the CuTe decoder substantially slower.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:42",
+    },
+    "nsa.parallel_nsa": {
+        "status": "no_go",
+        "reason": "Dynamic sparse selection is already fused into one autotuned program and lacks a native sparse-gather primitive.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:65",
+    },
+    "parallax.parallel_parallax": {
+        "status": "no_go",
+        "reason": "The native-MMA candidate passed parity but repeated K/V staging made it slower than Triton.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:69",
+    },
+    "rwkv6.chunk_rwkv6": {
+        "status": "no_go",
+        "reason": "Production shapes favor the existing chunk-parallel tensor-core pipeline over a persistent state recurrence.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:60",
+    },
+    "rwkv7.chunk_rwkv7": {
+        "status": "no_go",
+        "reason": "Production shapes favor the existing chunk-parallel tensor-core pipeline over a persistent state recurrence.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:60",
+    },
+    "rwkv7.fused_mul_recurrent_rwkv7": {
+        "status": "no_go",
+        "reason": "The CuTe recurrent candidate passed parity but Triton's direct register path remained faster.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:40",
+    },
+    "rwkv7.fused_recurrent_rwkv7": {
+        "status": "no_go",
+        "reason": "The shared DPLR recurrence has dependent FP32 GEMVs and rank-one updates with no useful MMA row dimension.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:77",
+    },
+    "ttt.fused_chunk_ttt_linear": {
+        "status": "no_go",
+        "reason": "Splitting its persistent fused recurrence would materialize chunk states and add substantial traffic.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:72",
+    },
+    "wall_attn.parallel_wall_attn_decode": {
+        "status": "no_go",
+        "reason": "The existing fused tensor-core decoder avoids the reductions and value rereads required by a scalar route.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:70",
+    },
+    "wall_attn.parallel_wall_attn": {
+        "status": "no_go",
+        "reason": "The scalar single-query CuTe candidate lost to the existing padded tensor-core decoder.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:44",
+    },
+}
+
+
+def _migration_fields(item_id: str, conversion: dict[str, Any]) -> dict[str, Any]:
+    decision = MIGRATION_DECISIONS.get(item_id)
+    if conversion["status"] == "present_unverified":
+        coverage_status = "present_unverified"
+    elif conversion["status"] == "not_applicable_platform":
+        coverage_status = "not_applicable_platform"
+    elif decision is not None:
+        coverage_status = decision["status"]
+    else:
+        coverage_status = "missing"
+    return {
+        "migration_decision": decision,
+        "coverage_status": coverage_status,
+    }
+
 
 def _literal_keyword(call: ast.Call, name: str, default: Any = None) -> Any:
     for keyword in call.keywords:
@@ -85,6 +228,85 @@ def _backend_markers(text: str) -> list[str]:
     return [backend for backend, pattern in markers.items() if re.search(pattern, text)]
 
 
+def _module_file(repo_root: Path, module: str) -> Path | None:
+    path = repo_root.joinpath(*module.split("."))
+    if path.with_suffix(".py").is_file():
+        return path.with_suffix(".py")
+    if (path / "__init__.py").is_file():
+        return path / "__init__.py"
+    return None
+
+
+def _absolute_import_module(repo_root: Path, source_file: Path, node: ast.ImportFrom) -> str:
+    relative = source_file.relative_to(repo_root).with_suffix("")
+    package = list(relative.parts[:-1])
+    if node.level:
+        prefix = package[: len(package) - node.level + 1]
+        return ".".join(prefix + ((node.module or "").split(".") if node.module else []))
+    return node.module or ""
+
+
+def _resolve_imported_symbols(
+    repo_root: Path,
+    module: str,
+    names: set[str],
+    seen: set[tuple[str, tuple[str, ...]]] | None = None,
+) -> list[tuple[str, Path]]:
+    seen = set() if seen is None else seen
+    key = (module, tuple(sorted(names)))
+    if key in seen:
+        return []
+    seen.add(key)
+    path = _module_file(repo_root, module)
+    if path is None:
+        return []
+    if path.name != "__init__.py" or "*" in names:
+        return [(module, path)]
+    resolved = []
+    for node in ast.walk(ast.parse(path.read_text())):
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        child_module = _absolute_import_module(repo_root, path, node)
+        for alias in node.names:
+            if (alias.asname or alias.name) in names:
+                resolved.extend(_resolve_imported_symbols(repo_root, child_module, {alias.name}, seen))
+    return resolved or [(module, path)]
+
+
+def _imported_modules(repo_root: Path, source_file: Path) -> list[tuple[str, Path]]:
+    tree = ast.parse(source_file.read_text())
+    imports = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        module = _absolute_import_module(repo_root, source_file, node)
+        if not module.startswith("fla.ops."):
+            continue
+        imports.extend(_resolve_imported_symbols(repo_root, module, {alias.asname or alias.name for alias in node.names}))
+    return imports
+
+
+def _transitive_cute_files(repo_root: Path, source_file: Path) -> set[Path]:
+    """Find CuTe dispatches reached through wrapper-only Python modules."""
+    found: set[Path] = set()
+    pending = [source_file]
+    visited: set[Path] = set()
+    while pending:
+        path = pending.pop()
+        if path in visited:
+            continue
+        visited.add(path)
+        text = path.read_text(errors="ignore")
+        imported = _imported_modules(repo_root, path)
+        for module, imported_path in imported:
+            if module.startswith("fla.ops.backends.cute."):
+                if module != "fla.ops.backends.cute.runtime" and "cute.compile" in imported_path.read_text(errors="ignore"):
+                    found.add(imported_path)
+            elif "@triton.jit" not in text and "@T.prim_func" not in text:
+                pending.append(imported_path)
+    return found
+
+
 def _native_cute_files(
     repo_root: Path,
     domain: str | None = None,
@@ -107,6 +329,10 @@ def _native_cute_files(
             path = repo_root.joinpath("fla", "ops", "backends", "cute", *module.split(".")).with_suffix(".py")
             candidates.append(path)
             direct_candidates.add(path)
+        if "@triton.jit" not in source_text and "@T.prim_func" not in source_text:
+            transitive_candidates = _transitive_cute_files(repo_root, source_file)
+            candidates.extend(transitive_candidates)
+            direct_candidates.update(transitive_candidates)
     return sorted(
         str(path.relative_to(repo_root))
         for path in set(candidates)
@@ -190,9 +416,14 @@ def _public_ops(repo_root: Path, registry: list[dict[str, Any]], test_files: lis
                 source_file=source_file,
             )
             symbol_tests = _symbol_tests(test_files, symbol, repo_root)
+            item_id = f"{domain_dir.name}.{symbol}"
+            conversion = {
+                "status": "present_unverified" if cute_files else "missing",
+                "cute_files": cute_files,
+            }
             records.append(
                 {
-                    "id": f"{domain_dir.name}.{symbol}",
+                    "id": item_id,
                     "domain": domain_dir.name,
                     "symbol": symbol,
                     "source_module": source_module,
@@ -206,10 +437,8 @@ def _public_ops(repo_root: Path, registry: list[dict[str, Any]], test_files: lis
                     "benchmark_targets": [target["name"] for target in benchmark_targets],
                     "benchmark_modes": sorted({mode for target in benchmark_targets for mode in target["modes"]}),
                     "benchmark_registered": bool(benchmark_targets),
-                    "conversion": {
-                        "status": "present_unverified" if cute_files else "missing",
-                        "cute_files": cute_files,
-                    },
+                    "conversion": conversion,
+                    **_migration_fields(item_id, conversion),
                     "evidence": {
                         "correctness": {"status": "unrun", "command": None, "artifact": None},
                         "benchmark": {"status": "unrun", "rows": []},
@@ -258,23 +487,24 @@ def _shared_internals(repo_root: Path, test_files: list[Path]) -> list[dict[str,
                     set(_native_cute_files(repo_root, module_stem=path.stem))
                     | set(_native_cute_files(repo_root, module_stem=f"{namespace.replace('/', '_')}_{path.stem}"))
                 )
+            item_id = module.removeprefix("fla.ops.")
+            conversion = {
+                "status": (
+                    "not_applicable_platform" if is_platform_backend else ("present_unverified" if cute_files else "missing")
+                ),
+                "cute_files": cute_files,
+            }
             records.append(
                 {
-                    "id": module.removeprefix("fla.ops."),
+                    "id": item_id,
                     "file": str(path.relative_to(repo_root)),
                     "implementation_backends": _backend_markers(text),
                     "kernel_symbols": _kernel_symbols(path),
                     "direct_consumers": consumers,
                     "consumer_count": len(consumers),
                     "tests": _direct_tests(test_files, module, repo_root),
-                    "conversion": {
-                        "status": (
-                            "not_applicable_platform"
-                            if is_platform_backend
-                            else ("present_unverified" if cute_files else "missing")
-                        ),
-                        "cute_files": cute_files,
-                    },
+                    "conversion": conversion,
+                    **_migration_fields(item_id, conversion),
                 }
             )
     return records
@@ -289,9 +519,14 @@ def build_manifest(repo_root: Path) -> dict[str, Any]:
         raise AssertionError(f"Expected {EXPECTED_PUBLIC_OPS} public optimized entry points, found {len(public_ops)}")
     if len(shared_internals) != EXPECTED_SHARED_KERNEL_FILES:
         raise AssertionError(f"Expected {EXPECTED_SHARED_KERNEL_FILES} shared kernel files, found {len(shared_internals)}")
+    all_records = [*public_ops, *shared_internals]
+    inventory_ids = {item["id"] for item in all_records}
+    unknown_decisions = sorted(MIGRATION_DECISIONS.keys() - inventory_ids)
+    if unknown_decisions:
+        raise AssertionError(f"Migration decisions reference unknown exact IDs: {unknown_decisions}")
 
     manifest = {
-        "manifest_version": 1,
+        "manifest_version": 2,
         "baseline": {
             "upstream_commit": UPSTREAM_BASELINE_COMMIT,
             "cute_migration_base_commit": CUTE_MIGRATION_BASE_COMMIT,
@@ -321,6 +556,27 @@ def build_manifest(repo_root: Path) -> dict[str, Any]:
             item["conversion"]["status"] == "present_unverified" for item in shared_internals
         ),
         "cute_shared_missing": sum(item["conversion"]["status"] == "missing" for item in shared_internals),
+        "public_coverage_present_unverified": sum(item["coverage_status"] == "present_unverified" for item in public_ops),
+        "public_coverage_no_go": sum(item["coverage_status"] == "no_go" for item in public_ops),
+        "public_coverage_deprecated": sum(item["coverage_status"] == "deprecated" for item in public_ops),
+        "public_coverage_missing": sum(item["coverage_status"] == "missing" for item in public_ops),
+        "shared_coverage_present_unverified": sum(
+            item["coverage_status"] == "present_unverified" for item in shared_internals
+        ),
+        "shared_coverage_not_applicable_platform": sum(
+            item["coverage_status"] == "not_applicable_platform" for item in shared_internals
+        ),
+        "shared_coverage_no_go": sum(item["coverage_status"] == "no_go" for item in shared_internals),
+        "shared_coverage_deprecated": sum(item["coverage_status"] == "deprecated" for item in shared_internals),
+        "shared_coverage_missing": sum(item["coverage_status"] == "missing" for item in shared_internals),
+        "migration_decision_no_go": sum(
+            item["migration_decision"] is not None and item["migration_decision"]["status"] == "no_go" for item in all_records
+        ),
+        "migration_decision_deprecated": sum(
+            item["migration_decision"] is not None and item["migration_decision"]["status"] == "deprecated"
+            for item in all_records
+        ),
+        "true_missing_ids": sorted(item["id"] for item in all_records if item["coverage_status"] == "missing"),
     }
     return manifest
 

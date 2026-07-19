@@ -186,16 +186,19 @@
       "test_file": "tests/ops/test_nsa.py"
     }
   ],
-  "manifest_version": 1,
+  "manifest_version": 2,
   "public_ops": [
     {
       "benchmark_modes": [],
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/abc.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "abc",
       "domain_test_present": false,
       "domain_tests": [],
@@ -219,6 +222,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "utils",
         "utils.logcumsumexp",
@@ -240,9 +244,12 @@
         "parallel_attn"
       ],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/parallel_attn.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "attn",
       "domain_test_present": true,
       "domain_tests": [
@@ -270,6 +277,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "common.backends.tilelang",
         "utils",
@@ -299,6 +307,7 @@
         "cute_files": [],
         "status": "missing"
       },
+      "coverage_status": "no_go",
       "domain": "attnres",
       "domain_test_present": true,
       "domain_tests": [
@@ -325,6 +334,11 @@
         "gluon",
         "triton"
       ],
+      "migration_decision": {
+        "reason": "The fused vector-reduction candidate was substantially slower across representative rows and widths.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:45",
+        "status": "no_go"
+      },
       "shared_dependencies": [
         "utils.cache",
         "utils.op"
@@ -345,6 +359,7 @@
         "cute_files": [],
         "status": "missing"
       },
+      "coverage_status": "no_go",
       "domain": "based",
       "domain_test_present": true,
       "domain_tests": [
@@ -370,6 +385,11 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": {
+        "reason": "The aligned four-warp Taylor-state kernel has no removable padding or launch boundary.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:73",
+        "status": "no_go"
+      },
       "shared_dependencies": [],
       "source_file": "fla/ops/based/fused_chunk.py",
       "source_module": "fused_chunk",
@@ -387,6 +407,7 @@
         "cute_files": [],
         "status": "missing"
       },
+      "coverage_status": "no_go",
       "domain": "based",
       "domain_test_present": true,
       "domain_tests": [
@@ -412,6 +433,11 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": {
+        "reason": "The fused streaming kernel beat analogous native-MMA candidates on the representative envelope.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:79",
+        "status": "no_go"
+      },
       "shared_dependencies": [],
       "source_file": "fla/ops/based/parallel.py",
       "source_module": "parallel",
@@ -431,9 +457,14 @@
         "chunk_comba"
       ],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/chunk_o.py",
+          "fla/ops/backends/cute/index.py",
+          "fla/ops/backends/cute/solve_tril.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "comba",
       "domain_test_present": true,
       "domain_tests": [
@@ -459,6 +490,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "common.chunk_delta_h",
         "common.chunk_o",
@@ -483,6 +515,7 @@
         "cute_files": [],
         "status": "missing"
       },
+      "coverage_status": "no_go",
       "domain": "comba",
       "domain_test_present": true,
       "domain_tests": [
@@ -508,6 +541,11 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": {
+        "reason": "Its dependent FP32 GEMVs and rank-one update have no useful native-MMA row dimension.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:67",
+        "status": "no_go"
+      },
       "shared_dependencies": [
         "common.chunk_delta_h",
         "common.chunk_o",
@@ -534,9 +572,15 @@
         "chunk_delta_rule"
       ],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/chunk_o.py",
+          "fla/ops/backends/cute/delta_rule_wy.py",
+          "fla/ops/backends/cute/index.py",
+          "fla/ops/backends/cute/solve_tril.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "delta_rule",
       "domain_test_present": true,
       "domain_tests": [
@@ -562,6 +606,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "common.chunk_delta_h",
         "common.chunk_o",
@@ -587,6 +632,7 @@
         "cute_files": [],
         "status": "missing"
       },
+      "coverage_status": "deprecated",
       "domain": "delta_rule",
       "domain_test_present": true,
       "domain_tests": [
@@ -612,6 +658,11 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": {
+        "reason": "The compatibility symbol unconditionally raises and directs callers to chunk_delta_rule.",
+        "source": "fla/ops/delta_rule/fused_chunk.py:8",
+        "status": "deprecated"
+      },
       "shared_dependencies": [
         "common.chunk_delta_h",
         "common.chunk_o",
@@ -635,6 +686,7 @@
         "cute_files": [],
         "status": "missing"
       },
+      "coverage_status": "no_go",
       "domain": "delta_rule",
       "domain_test_present": true,
       "domain_tests": [
@@ -660,6 +712,11 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": {
+        "reason": "The bounded CuTe recurrence passed parity but was substantially slower than the existing fused kernel.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:62",
+        "status": "no_go"
+      },
       "shared_dependencies": [
         "common.chunk_delta_h",
         "common.chunk_o",
@@ -685,6 +742,7 @@
         "cute_files": [],
         "status": "missing"
       },
+      "coverage_status": "no_go",
       "domain": "deltaformer",
       "domain_test_present": true,
       "domain_tests": [
@@ -710,6 +768,11 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": {
+        "reason": "Exact dense intermediates require a large triangular solve that the current CuTe path cannot consume.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:61",
+        "status": "no_go"
+      },
       "shared_dependencies": [],
       "source_file": "fla/ops/deltaformer/parallel.py",
       "source_module": "parallel",
@@ -724,9 +787,13 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/forgetting_attn.py",
+          "fla/ops/backends/cute/parallel_attn.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "forgetting_attn",
       "domain_test_present": true,
       "domain_tests": [
@@ -750,6 +817,7 @@
       },
       "id": "forgetting_attn.parallel_forgetting_attn",
       "implementation_backends": [],
+      "migration_decision": null,
       "shared_dependencies": [],
       "source_file": "fla/ops/forgetting_attn/parallel.py",
       "source_module": "parallel",
@@ -764,9 +832,18 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/chunk_o.py",
+          "fla/ops/backends/cute/cp_chunk_delta_h.py",
+          "fla/ops/backends/cute/delta_rule_wy.py",
+          "fla/ops/backends/cute/gate.py",
+          "fla/ops/backends/cute/gated_delta_rule.py",
+          "fla/ops/backends/cute/index.py",
+          "fla/ops/backends/cute/solve_tril.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "gated_delta_product",
       "domain_test_present": true,
       "domain_tests": [
@@ -793,6 +870,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "common.chunk_scaled_dot_kkt",
         "utils",
@@ -819,9 +897,16 @@
         "chunk_gdn"
       ],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/chunk_o.py",
+          "fla/ops/backends/cute/cp_chunk_delta_h.py",
+          "fla/ops/backends/cute/gate.py",
+          "fla/ops/backends/cute/gated_delta_rule.py",
+          "fla/ops/backends/cute/index.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "gated_delta_rule",
       "domain_test_present": true,
       "domain_tests": [
@@ -850,6 +935,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "common.chunk_delta_h",
         "common.chunk_o",
@@ -884,9 +970,16 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/chunk_o.py",
+          "fla/ops/backends/cute/cp_chunk_delta_h.py",
+          "fla/ops/backends/cute/gate.py",
+          "fla/ops/backends/cute/gated_delta_rule.py",
+          "fla/ops/backends/cute/index.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "gated_delta_rule",
       "domain_test_present": true,
       "domain_tests": [
@@ -915,6 +1008,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "common.chunk_delta_h",
         "common.chunk_o",
@@ -940,9 +1034,12 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/gated_delta_rule.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "gated_delta_rule",
       "domain_test_present": true,
       "domain_tests": [
@@ -971,6 +1068,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "common.chunk_delta_h",
         "common.chunk_o",
@@ -998,9 +1096,12 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/gated_delta_rule.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "gated_delta_rule",
       "domain_test_present": true,
       "domain_tests": [
@@ -1029,6 +1130,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "common.chunk_delta_h",
         "common.chunk_o",
@@ -1054,9 +1156,13 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/index.py",
+          "fla/ops/backends/cute/solve_tril.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "gated_oja_rule",
       "domain_test_present": true,
       "domain_tests": [
@@ -1082,6 +1188,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "utils",
         "utils.index",
@@ -1105,6 +1212,7 @@
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "gated_oja_rule",
       "domain_test_present": true,
       "domain_tests": [
@@ -1130,6 +1238,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "utils",
         "utils.index",
@@ -1148,9 +1257,12 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/index.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "gdn2",
       "domain_test_present": true,
       "domain_tests": [
@@ -1176,6 +1288,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "common.chunk_delta_h",
         "utils",
@@ -1197,9 +1310,12 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/gdn2.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "gdn2",
       "domain_test_present": true,
       "domain_tests": [
@@ -1225,6 +1341,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "common.chunk_delta_h",
         "utils",
@@ -1251,9 +1368,13 @@
         "chunk_dplr_delta_rule"
       ],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/cp_chunk_delta_h.py",
+          "fla/ops/backends/cute/index.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "generalized_delta_rule",
       "domain_test_present": true,
       "domain_tests": [
@@ -1282,6 +1403,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "cp",
         "cp.chunk_delta_h",
@@ -1308,6 +1430,7 @@
         "cute_files": [],
         "status": "missing"
       },
+      "coverage_status": "no_go",
       "domain": "generalized_delta_rule",
       "domain_test_present": true,
       "domain_tests": [
@@ -1336,6 +1459,11 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": {
+        "reason": "The sequential CuTe recurrence violates the production chunk algorithm's numerical contract.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:66",
+        "status": "no_go"
+      },
       "shared_dependencies": [
         "cp",
         "cp.chunk_delta_h",
@@ -1356,9 +1484,13 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/cp_chunk_delta_h.py",
+          "fla/ops/backends/cute/index.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "generalized_delta_rule",
       "domain_test_present": true,
       "domain_tests": [
@@ -1387,6 +1519,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "cp",
         "cp.chunk_delta_h",
@@ -1411,6 +1544,7 @@
         "cute_files": [],
         "status": "missing"
       },
+      "coverage_status": "no_go",
       "domain": "generalized_delta_rule",
       "domain_test_present": true,
       "domain_tests": [
@@ -1439,6 +1573,11 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": {
+        "reason": "The FP32 CuTe recurrence passed parity but remained slower than the one-launch Triton kernel.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:56",
+        "status": "no_go"
+      },
       "shared_dependencies": [
         "cp",
         "cp.chunk_delta_h",
@@ -1467,6 +1606,7 @@
         "cute_files": [],
         "status": "missing"
       },
+      "coverage_status": "no_go",
       "domain": "gla",
       "domain_test_present": true,
       "domain_tests": [
@@ -1492,6 +1632,11 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": {
+        "reason": "Representative shapes already use chunk-parallel tensor-core stages and require a full multiwarp pipeline.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:58",
+        "status": "no_go"
+      },
       "shared_dependencies": [
         "common.chunk_h",
         "common.fused_recurrent",
@@ -1517,6 +1662,7 @@
         "cute_files": [],
         "status": "missing"
       },
+      "coverage_status": "deprecated",
       "domain": "gla",
       "domain_test_present": true,
       "domain_tests": [
@@ -1542,6 +1688,11 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": {
+        "reason": "The compatibility symbol unconditionally raises and directs callers to chunk_gla.",
+        "source": "fla/ops/gla/fused_chunk.py:8",
+        "status": "deprecated"
+      },
       "shared_dependencies": [
         "common.chunk_h",
         "common.fused_recurrent",
@@ -1562,9 +1713,12 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/fused_recurrent.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "gla",
       "domain_test_present": true,
       "domain_tests": [
@@ -1590,6 +1744,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "common.chunk_h",
         "common.fused_recurrent",
@@ -1612,9 +1767,12 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/gsa.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "gsa",
       "domain_test_present": true,
       "domain_tests": [
@@ -1640,6 +1798,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "common.chunk_h",
         "common.fused_recurrent",
@@ -1662,9 +1821,12 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/gsa.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "gsa",
       "domain_test_present": true,
       "domain_tests": [
@@ -1690,6 +1852,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "common.chunk_h",
         "common.fused_recurrent",
@@ -1717,6 +1880,7 @@
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "hgrn",
       "domain_test_present": true,
       "domain_tests": [
@@ -1742,6 +1906,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "utils.op"
       ],
@@ -1763,9 +1928,12 @@
         "fused_recurrent_hgrn"
       ],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/hgrn.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "hgrn",
       "domain_test_present": true,
       "domain_tests": [
@@ -1791,6 +1959,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "utils.op"
       ],
@@ -1812,9 +1981,14 @@
         "chunk_kda"
       ],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/cp_chunk_delta_h.py",
+          "fla/ops/backends/cute/gate.py",
+          "fla/ops/backends/cute/index.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "kda",
       "domain_test_present": true,
       "domain_tests": [
@@ -1846,6 +2020,11 @@
         "tilelang",
         "triton"
       ],
+      "migration_decision": {
+        "reason": "Representative execution is an end-to-end multi-stage chunk pipeline, not a replaceable recurrence slice.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:59",
+        "status": "no_go"
+      },
       "shared_dependencies": [
         "common.chunk_delta_h",
         "common.gate",
@@ -1873,9 +2052,12 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/kda.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "kda",
       "domain_test_present": true,
       "domain_tests": [
@@ -1907,6 +2089,7 @@
         "tilelang",
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "common.chunk_delta_h",
         "common.gate",
@@ -1937,9 +2120,14 @@
         "chunk_lightning_attn"
       ],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/chunk_h.py",
+          "fla/ops/backends/cute/chunk_o.py",
+          "fla/ops/backends/cute/index.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "lightning_attn",
       "domain_test_present": true,
       "domain_tests": [
@@ -1963,6 +2151,7 @@
       },
       "id": "lightning_attn.chunk_lightning_attn",
       "implementation_backends": [],
+      "migration_decision": null,
       "shared_dependencies": [],
       "source_file": "fla/ops/lightning_attn/chunk.py",
       "source_module": "chunk",
@@ -1977,9 +2166,12 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/fused_recurrent.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "lightning_attn",
       "domain_test_present": true,
       "domain_tests": [
@@ -2003,6 +2195,7 @@
       },
       "id": "lightning_attn.fused_recurrent_lightning_attn",
       "implementation_backends": [],
+      "migration_decision": null,
       "shared_dependencies": [],
       "source_file": "fla/ops/lightning_attn/fused_recurrent.py",
       "source_module": "fused_recurrent",
@@ -2022,9 +2215,14 @@
         "chunk_linear_attn"
       ],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/chunk_h.py",
+          "fla/ops/backends/cute/chunk_o.py",
+          "fla/ops/backends/cute/index.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "linear_attn",
       "domain_test_present": true,
       "domain_tests": [
@@ -2048,6 +2246,7 @@
       },
       "id": "linear_attn.chunk_linear_attn",
       "implementation_backends": [],
+      "migration_decision": null,
       "shared_dependencies": [
         "utils.cumsum"
       ],
@@ -2064,9 +2263,12 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/fused_chunk.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "linear_attn",
       "domain_test_present": true,
       "domain_tests": [
@@ -2090,6 +2292,7 @@
       },
       "id": "linear_attn.fused_chunk_linear_attn",
       "implementation_backends": [],
+      "migration_decision": null,
       "shared_dependencies": [
         "utils.cumsum"
       ],
@@ -2106,9 +2309,12 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/fused_recurrent.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "linear_attn",
       "domain_test_present": true,
       "domain_tests": [
@@ -2132,6 +2338,7 @@
       },
       "id": "linear_attn.fused_recurrent_linear_attn",
       "implementation_backends": [],
+      "migration_decision": null,
       "shared_dependencies": [
         "utils.cumsum"
       ],
@@ -2148,9 +2355,12 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/log_linear_attn.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "log_linear_attn",
       "domain_test_present": true,
       "domain_tests": [
@@ -2176,6 +2386,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "utils",
         "utils.op"
@@ -2193,9 +2404,13 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/chunk_h.py",
+          "fla/ops/backends/cute/index.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "mesa_net",
       "domain_test_present": true,
       "domain_tests": [
@@ -2221,6 +2436,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "common.chunk_h",
         "utils",
@@ -2243,6 +2459,7 @@
         "cute_files": [],
         "status": "missing"
       },
+      "coverage_status": "no_go",
       "domain": "mesa_net",
       "domain_test_present": true,
       "domain_tests": [
@@ -2268,6 +2485,11 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": {
+        "reason": "The required shared state and cooperative reductions made the CuTe decoder substantially slower.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:42",
+        "status": "no_go"
+      },
       "shared_dependencies": [
         "common.chunk_h",
         "utils",
@@ -2287,9 +2509,12 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/index.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "moba",
       "domain_test_present": true,
       "domain_tests": [
@@ -2313,6 +2538,7 @@
       },
       "id": "moba.parallel_moba",
       "implementation_backends": [],
+      "migration_decision": null,
       "shared_dependencies": [
         "utils.index"
       ],
@@ -2338,6 +2564,7 @@
         "cute_files": [],
         "status": "missing"
       },
+      "coverage_status": "no_go",
       "domain": "nsa",
       "domain_test_present": true,
       "domain_tests": [
@@ -2363,6 +2590,11 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": {
+        "reason": "Dynamic sparse selection is already fused into one autotuned program and lacks a native sparse-gather primitive.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:65",
+        "status": "no_go"
+      },
       "shared_dependencies": [
         "utils",
         "utils.op",
@@ -2384,6 +2616,7 @@
         "cute_files": [],
         "status": "missing"
       },
+      "coverage_status": "no_go",
       "domain": "parallax",
       "domain_test_present": true,
       "domain_tests": [
@@ -2409,6 +2642,11 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": {
+        "reason": "The native-MMA candidate passed parity but repeated K/V staging made it slower than Triton.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:69",
+        "status": "no_go"
+      },
       "shared_dependencies": [
         "utils",
         "utils.op"
@@ -2426,9 +2664,14 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/parallel_attn.py",
+          "fla/ops/backends/cute/path_attn.py",
+          "fla/ops/backends/cute/solve_tril.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "path_attn",
       "domain_test_present": true,
       "domain_tests": [
@@ -2454,6 +2697,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "common.chunk_scaled_dot_kkt",
         "utils",
@@ -2472,9 +2716,12 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/rebased.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "rebased",
       "domain_test_present": false,
       "domain_tests": [],
@@ -2498,6 +2745,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [],
       "source_file": "fla/ops/rebased/parallel.py",
       "source_module": "parallel",
@@ -2515,9 +2763,14 @@
         "chunk_retention"
       ],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/chunk_h.py",
+          "fla/ops/backends/cute/chunk_o.py",
+          "fla/ops/backends/cute/index.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "retention",
       "domain_test_present": true,
       "domain_tests": [
@@ -2541,7 +2794,11 @@
       },
       "id": "retention.chunk_retention",
       "implementation_backends": [],
-      "shared_dependencies": [],
+      "migration_decision": null,
+      "shared_dependencies": [
+        "utils.constant",
+        "utils.cumsum"
+      ],
       "source_file": "fla/ops/retention/chunk.py",
       "source_module": "chunk",
       "symbol": "chunk_retention",
@@ -2555,9 +2812,12 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/fused_chunk.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "retention",
       "domain_test_present": true,
       "domain_tests": [
@@ -2581,7 +2841,11 @@
       },
       "id": "retention.fused_chunk_retention",
       "implementation_backends": [],
-      "shared_dependencies": [],
+      "migration_decision": null,
+      "shared_dependencies": [
+        "utils.constant",
+        "utils.cumsum"
+      ],
       "source_file": "fla/ops/retention/fused_chunk.py",
       "source_module": "fused_chunk",
       "symbol": "fused_chunk_retention",
@@ -2595,9 +2859,12 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/fused_recurrent.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "retention",
       "domain_test_present": true,
       "domain_tests": [
@@ -2621,7 +2888,11 @@
       },
       "id": "retention.fused_recurrent_retention",
       "implementation_backends": [],
-      "shared_dependencies": [],
+      "migration_decision": null,
+      "shared_dependencies": [
+        "utils.constant",
+        "utils.cumsum"
+      ],
       "source_file": "fla/ops/retention/fused_recurrent.py",
       "source_module": "fused_recurrent",
       "symbol": "fused_recurrent_retention",
@@ -2635,9 +2906,13 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/parallel_retention.py",
+          "fla/ops/backends/cute/parallel_simple_gla.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "retention",
       "domain_test_present": true,
       "domain_tests": [
@@ -2661,7 +2936,11 @@
       },
       "id": "retention.parallel_retention",
       "implementation_backends": [],
-      "shared_dependencies": [],
+      "migration_decision": null,
+      "shared_dependencies": [
+        "utils.constant",
+        "utils.cumsum"
+      ],
       "source_file": "fla/ops/retention/parallel.py",
       "source_module": "parallel",
       "symbol": "parallel_retention",
@@ -2680,6 +2959,7 @@
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "rwkv4",
       "domain_test_present": false,
       "domain_tests": [],
@@ -2703,6 +2983,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "utils.op"
       ],
@@ -2725,6 +3006,7 @@
         "cute_files": [],
         "status": "missing"
       },
+      "coverage_status": "no_go",
       "domain": "rwkv6",
       "domain_test_present": true,
       "domain_tests": [
@@ -2750,6 +3032,11 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": {
+        "reason": "Production shapes favor the existing chunk-parallel tensor-core pipeline over a persistent state recurrence.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:60",
+        "status": "no_go"
+      },
       "shared_dependencies": [
         "common.chunk_h",
         "utils",
@@ -2769,9 +3056,12 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/rwkv6.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "rwkv6",
       "domain_test_present": true,
       "domain_tests": [
@@ -2797,6 +3087,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "common.chunk_h",
         "utils",
@@ -2821,9 +3112,13 @@
         "chunk_rwkv7"
       ],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/cp_chunk_delta_h.py",
+          "fla/ops/backends/cute/index.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "rwkv7",
       "domain_test_present": true,
       "domain_tests": [
@@ -2850,6 +3145,11 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": {
+        "reason": "Production shapes favor the existing chunk-parallel tensor-core pipeline over a persistent state recurrence.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:60",
+        "status": "no_go"
+      },
       "shared_dependencies": [
         "cp",
         "utils",
@@ -2872,6 +3172,7 @@
         "cute_files": [],
         "status": "missing"
       },
+      "coverage_status": "no_go",
       "domain": "rwkv7",
       "domain_test_present": true,
       "domain_tests": [
@@ -2898,6 +3199,11 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": {
+        "reason": "The CuTe recurrent candidate passed parity but Triton's direct register path remained faster.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:40",
+        "status": "no_go"
+      },
       "shared_dependencies": [
         "cp",
         "utils",
@@ -2919,6 +3225,7 @@
         "cute_files": [],
         "status": "missing"
       },
+      "coverage_status": "no_go",
       "domain": "rwkv7",
       "domain_test_present": true,
       "domain_tests": [
@@ -2945,6 +3252,11 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": {
+        "reason": "The shared DPLR recurrence has dependent FP32 GEMVs and rank-one updates with no useful MMA row dimension.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:77",
+        "status": "no_go"
+      },
       "shared_dependencies": [
         "cp",
         "utils",
@@ -2966,9 +3278,14 @@
         "chunk_simple_gla"
       ],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/chunk_h.py",
+          "fla/ops/backends/cute/chunk_o.py",
+          "fla/ops/backends/cute/index.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "simple_gla",
       "domain_test_present": true,
       "domain_tests": [
@@ -2994,6 +3311,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "common.chunk_h",
         "common.chunk_o",
@@ -3017,9 +3335,12 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/fused_chunk.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "simple_gla",
       "domain_test_present": true,
       "domain_tests": [
@@ -3045,6 +3366,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "common.chunk_h",
         "common.chunk_o",
@@ -3068,9 +3390,12 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/fused_recurrent.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "simple_gla",
       "domain_test_present": true,
       "domain_tests": [
@@ -3096,6 +3421,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "common.chunk_h",
         "common.chunk_o",
@@ -3119,9 +3445,12 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/parallel_simple_gla.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "simple_gla",
       "domain_test_present": true,
       "domain_tests": [
@@ -3147,6 +3476,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "common.chunk_h",
         "common.chunk_o",
@@ -3170,9 +3500,12 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/ttt.py"
+        ],
+        "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "domain": "ttt",
       "domain_test_present": true,
       "domain_tests": [
@@ -3198,6 +3531,7 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": null,
       "shared_dependencies": [
         "utils"
       ],
@@ -3217,6 +3551,7 @@
         "cute_files": [],
         "status": "missing"
       },
+      "coverage_status": "no_go",
       "domain": "ttt",
       "domain_test_present": true,
       "domain_tests": [
@@ -3242,6 +3577,11 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": {
+        "reason": "Splitting its persistent fused recurrence would materialize chunk states and add substantial traffic.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:72",
+        "status": "no_go"
+      },
       "shared_dependencies": [
         "utils"
       ],
@@ -3261,6 +3601,7 @@
         "cute_files": [],
         "status": "missing"
       },
+      "coverage_status": "no_go",
       "domain": "wall_attn",
       "domain_test_present": true,
       "domain_tests": [
@@ -3286,6 +3627,11 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": {
+        "reason": "The scalar single-query CuTe candidate lost to the existing padded tensor-core decoder.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:44",
+        "status": "no_go"
+      },
       "shared_dependencies": [
         "utils",
         "utils.constant",
@@ -3308,6 +3654,7 @@
         "cute_files": [],
         "status": "missing"
       },
+      "coverage_status": "no_go",
       "domain": "wall_attn",
       "domain_test_present": true,
       "domain_tests": [
@@ -3333,6 +3680,11 @@
       "implementation_backends": [
         "triton"
       ],
+      "migration_decision": {
+        "reason": "The existing fused tensor-core decoder avoids the reductions and value rereads required by a scalar route.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:70",
+        "status": "no_go"
+      },
       "shared_dependencies": [
         "utils",
         "utils.constant",
@@ -3364,6 +3716,7 @@
         "cute_files": [],
         "status": "not_applicable_platform"
       },
+      "coverage_status": "not_applicable_platform",
       "direct_consumers": [],
       "file": "fla/ops/common/backends/tilelang/chunk_bwd.py",
       "id": "common.backends.tilelang.chunk_bwd",
@@ -3374,6 +3727,7 @@
         "kernel",
         "kernel"
       ],
+      "migration_decision": null,
       "tests": []
     },
     {
@@ -3382,6 +3736,7 @@
         "cute_files": [],
         "status": "not_applicable_platform"
       },
+      "coverage_status": "not_applicable_platform",
       "direct_consumers": [],
       "file": "fla/ops/common/backends/tilelang/parallel_attn_bwd.py",
       "id": "common.backends.tilelang.parallel_attn_bwd",
@@ -3392,6 +3747,7 @@
         "kernel",
         "kernel"
       ],
+      "migration_decision": null,
       "tests": []
     },
     {
@@ -3400,6 +3756,7 @@
         "cute_files": [],
         "status": "not_applicable_platform"
       },
+      "coverage_status": "not_applicable_platform",
       "direct_consumers": [],
       "file": "fla/ops/common/backends/tilelang/parallel_attn_fwd.py",
       "id": "common.backends.tilelang.parallel_attn_fwd",
@@ -3410,6 +3767,7 @@
         "kernel",
         "kernel"
       ],
+      "migration_decision": null,
       "tests": []
     },
     {
@@ -3418,6 +3776,7 @@
         "cute_files": [],
         "status": "not_applicable_platform"
       },
+      "coverage_status": "not_applicable_platform",
       "direct_consumers": [],
       "file": "fla/ops/common/backends/triton_ascend/chunk_delta_h.py",
       "id": "common.backends.triton_ascend.chunk_delta_h",
@@ -3428,6 +3787,7 @@
         "chunk_gated_delta_rule_fwd_kernel_h_blockdim64_npu",
         "chunk_gated_delta_rule_bwd_kernel_dhu_blockdim64_npu"
       ],
+      "migration_decision": null,
       "tests": []
     },
     {
@@ -3436,6 +3796,7 @@
         "cute_files": [],
         "status": "not_applicable_platform"
       },
+      "coverage_status": "not_applicable_platform",
       "direct_consumers": [],
       "file": "fla/ops/common/backends/triton_ascend/chunk_o.py",
       "id": "common.backends.triton_ascend.chunk_o",
@@ -3452,6 +3813,7 @@
         "chunk_bwd_kernel_dqkwg_npu",
         "chunk_bwd_kernel_dg_npu"
       ],
+      "migration_decision": null,
       "tests": []
     },
     {
@@ -3460,6 +3822,7 @@
         "cute_files": [],
         "status": "not_applicable_platform"
       },
+      "coverage_status": "not_applicable_platform",
       "direct_consumers": [],
       "file": "fla/ops/common/backends/triton_ascend/chunk_scaled_dot_kkt.py",
       "id": "common.backends.triton_ascend.chunk_scaled_dot_kkt",
@@ -3469,6 +3832,7 @@
       "kernel_symbols": [
         "chunk_scaled_dot_kkt_fwd_kernel_npu"
       ],
+      "migration_decision": null,
       "tests": []
     },
     {
@@ -3477,6 +3841,7 @@
         "cute_files": [],
         "status": "not_applicable_platform"
       },
+      "coverage_status": "not_applicable_platform",
       "direct_consumers": [],
       "file": "fla/ops/common/backends/triton_ascend/gate.py",
       "id": "common.backends.triton_ascend.gate",
@@ -3487,6 +3852,7 @@
         "fused_beta_sigmoid_fwd_kernel",
         "fused_beta_sigmoid_bwd_kernel"
       ],
+      "migration_decision": null,
       "tests": []
     },
     {
@@ -3495,6 +3861,7 @@
         "cute_files": [],
         "status": "missing"
       },
+      "coverage_status": "no_go",
       "direct_consumers": [
         "fla/ops/comba/chunk.py",
         "fla/ops/delta_rule/chunk.py",
@@ -3513,6 +3880,11 @@
         "chunk_gated_delta_rule_fwd_kernel_h_blockdim64",
         "chunk_gated_delta_rule_bwd_kernel_dhu_blockdim64"
       ],
+      "migration_decision": {
+        "reason": "The CuTe state-update candidate passed parity but measured 0.13-0.68x across representative work.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:26",
+        "status": "no_go"
+      },
       "tests": [
         "tests/ops/test_gdn.py",
         "tests/ops/test_gdn_kernels.py"
@@ -3526,6 +3898,7 @@
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "direct_consumers": [
         "fla/ops/gla/chunk.py",
         "fla/ops/gsa/chunk.py",
@@ -3542,6 +3915,7 @@
         "chunk_fwd_kernel_h",
         "chunk_bwd_kernel_dh"
       ],
+      "migration_decision": null,
       "tests": []
     },
     {
@@ -3552,6 +3926,7 @@
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "direct_consumers": [],
       "file": "fla/ops/common/chunk_h_parallel.py",
       "id": "common.chunk_h_parallel",
@@ -3564,6 +3939,7 @@
         "chunk_bwd_kernel_dh_parallel",
         "chunk_bwd_kernel_dh_reduction"
       ],
+      "migration_decision": null,
       "tests": []
     },
     {
@@ -3574,6 +3950,7 @@
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "direct_consumers": [],
       "file": "fla/ops/common/chunk_h_split.py",
       "id": "common.chunk_h_split",
@@ -3586,6 +3963,7 @@
         "chunk_bwd_kernel_dh_split",
         "chunk_bwd_kernel_dh_reduction"
       ],
+      "migration_decision": null,
       "tests": []
     },
     {
@@ -3596,6 +3974,7 @@
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "direct_consumers": [
         "fla/ops/comba/chunk.py",
         "fla/ops/delta_rule/chunk.py",
@@ -3613,17 +3992,20 @@
         "chunk_bwd_kernel_dv",
         "chunk_bwd_kernel_dv_local"
       ],
+      "migration_decision": null,
       "tests": [
         "tests/ops/test_gdn_kernels.py"
       ]
     },
     {
-      "consumer_count": 5,
+      "consumer_count": 6,
       "conversion": {
         "cute_files": [],
         "status": "missing"
       },
+      "coverage_status": "no_go",
       "direct_consumers": [
+        "fla/ops/delta_rule/chunk.py",
         "fla/ops/delta_rule/wy_fast.py",
         "fla/ops/gated_delta_product/chunk.py",
         "fla/ops/gated_delta_rule/backends/triton_ascend/chunk_fwd.py",
@@ -3638,6 +4020,11 @@
       "kernel_symbols": [
         "chunk_scaled_dot_kkt_fwd_kernel"
       ],
+      "migration_decision": {
+        "reason": "The exact native-MMA KKT candidate measured 0.59-0.65x because its separate epilogue launch dominated.",
+        "source": "profile/cute-dsl-migration/OPT_LOG.md:34",
+        "status": "no_go"
+      },
       "tests": [
         "tests/ops/test_solve_tril.py"
       ]
@@ -3650,6 +4037,7 @@
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "direct_consumers": [
         "fla/ops/simple_gla/fused_chunk.py"
       ],
@@ -3662,6 +4050,7 @@
         "fused_chunk_fwd_kernel",
         "fused_chunk_bwd_kernel"
       ],
+      "migration_decision": null,
       "tests": []
     },
     {
@@ -3672,6 +4061,7 @@
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "direct_consumers": [
         "fla/ops/gla/fused_recurrent.py",
         "fla/ops/gsa/fused_recurrent.py",
@@ -3686,6 +4076,7 @@
         "fused_recurrent_fwd_kernel",
         "fused_recurrent_bwd_kernel"
       ],
+      "migration_decision": null,
       "tests": []
     },
     {
@@ -3696,6 +4087,7 @@
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "direct_consumers": [
         "fla/ops/gated_delta_rule/chunk.py",
         "fla/ops/kda/chunk.py"
@@ -3709,6 +4101,7 @@
         "fused_beta_sigmoid_fwd_kernel",
         "fused_beta_sigmoid_bwd_kernel"
       ],
+      "migration_decision": null,
       "tests": []
     },
     {
@@ -3717,6 +4110,7 @@
         "cute_files": [],
         "status": "not_applicable_platform"
       },
+      "coverage_status": "not_applicable_platform",
       "direct_consumers": [],
       "file": "fla/ops/utils/backends/triton_ascend/cumsum.py",
       "id": "utils.backends.triton_ascend.cumsum",
@@ -3729,6 +4123,7 @@
         "chunk_global_cumsum_scalar_kernel_npu",
         "chunk_global_cumsum_vector_kernel_npu"
       ],
+      "migration_decision": null,
       "tests": []
     },
     {
@@ -3737,6 +4132,7 @@
         "cute_files": [],
         "status": "not_applicable_platform"
       },
+      "coverage_status": "not_applicable_platform",
       "direct_consumers": [],
       "file": "fla/ops/utils/backends/triton_ascend/solve_tril.py",
       "id": "utils.backends.triton_ascend.solve_tril",
@@ -3748,6 +4144,7 @@
         "merge_16x16_to_32x32_inverse_kernel_npu",
         "merge_16x16_to_64x64_inverse_kernel_npu"
       ],
+      "migration_decision": null,
       "tests": []
     },
     {
@@ -3758,6 +4155,7 @@
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "direct_consumers": [],
       "file": "fla/ops/utils/csr.py",
       "id": "utils.csr",
@@ -3767,18 +4165,20 @@
       "kernel_symbols": [
         "prepare_block_csr_kernel"
       ],
+      "migration_decision": null,
       "tests": [
         "tests/ops/utils/test_csr.py"
       ]
     },
     {
-      "consumer_count": 9,
+      "consumer_count": 10,
       "conversion": {
         "cute_files": [
           "fla/ops/backends/cute/cumsum.py"
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "direct_consumers": [
         "fla/ops/attn/decoding.py",
         "fla/ops/attn/parallel.py",
@@ -3786,6 +4186,7 @@
         "fla/ops/gsa/chunk.py",
         "fla/ops/linear_attn/utils.py",
         "fla/ops/path_attn/parallel.py",
+        "fla/ops/retention/parallel.py",
         "fla/ops/simple_gla/parallel.py",
         "fla/ops/wall_attn/naive.py",
         "fla/ops/wall_attn/parallel.py"
@@ -3801,6 +4202,7 @@
         "chunk_global_cumsum_scalar_kernel",
         "chunk_global_cumsum_vector_kernel"
       ],
+      "migration_decision": null,
       "tests": [
         "tests/ops/test_wall_attn.py"
       ]
@@ -3813,6 +4215,7 @@
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "direct_consumers": [
         "fla/ops/comba/utils.py",
         "fla/ops/common/intracard_cp.py",
@@ -3834,6 +4237,7 @@
       "kernel_symbols": [
         "prepare_position_ids_kernel"
       ],
+      "migration_decision": null,
       "tests": [
         "tests/ops/utils/test_index.py",
         "tests/ops/utils/test_pack.py"
@@ -3847,6 +4251,7 @@
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "direct_consumers": [
         "fla/ops/abc/chunk.py"
       ],
@@ -3858,6 +4263,7 @@
       "kernel_symbols": [
         "logcumsumexp_fwd_kernel"
       ],
+      "migration_decision": null,
       "tests": []
     },
     {
@@ -3868,6 +4274,7 @@
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "direct_consumers": [],
       "file": "fla/ops/utils/logsumexp.py",
       "id": "utils.logsumexp",
@@ -3877,6 +4284,7 @@
       "kernel_symbols": [
         "logsumexp_fwd_kernel"
       ],
+      "migration_decision": null,
       "tests": []
     },
     {
@@ -3887,6 +4295,7 @@
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "direct_consumers": [],
       "file": "fla/ops/utils/matmul.py",
       "id": "utils.matmul",
@@ -3900,6 +4309,7 @@
         "tanh",
         "relu"
       ],
+      "migration_decision": null,
       "tests": []
     },
     {
@@ -3910,6 +4320,7 @@
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "direct_consumers": [
         "fla/ops/abc/chunk.py",
         "fla/ops/attn/decoding.py",
@@ -4009,6 +4420,7 @@
         "gather",
         "make_tensor_descriptor"
       ],
+      "migration_decision": null,
       "tests": []
     },
     {
@@ -4019,6 +4431,7 @@
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "direct_consumers": [],
       "file": "fla/ops/utils/pack.py",
       "id": "utils.pack",
@@ -4028,6 +4441,7 @@
       "kernel_symbols": [
         "packunpack_sequence_kernel"
       ],
+      "migration_decision": null,
       "tests": [
         "tests/ops/utils/test_pack.py"
       ]
@@ -4040,6 +4454,7 @@
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "direct_consumers": [
         "fla/ops/nsa/naive.py",
         "fla/ops/nsa/parallel.py"
@@ -4053,20 +4468,23 @@
         "mean_pooling_fwd_kernel",
         "mean_pooling_bwd_kernel"
       ],
+      "migration_decision": null,
       "tests": [
         "tests/ops/test_nsa.py"
       ]
     },
     {
-      "consumer_count": 1,
+      "consumer_count": 2,
       "conversion": {
         "cute_files": [
           "fla/ops/backends/cute/softmax.py"
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "direct_consumers": [
-        "fla/ops/gsa/chunk.py"
+        "fla/ops/gsa/chunk.py",
+        "fla/ops/gsa/fused_recurrent.py"
       ],
       "file": "fla/ops/utils/softmax.py",
       "id": "utils.softmax",
@@ -4077,6 +4495,7 @@
         "softmax_fwd_kernel",
         "softmax_bwd_kernel"
       ],
+      "migration_decision": null,
       "tests": []
     },
     {
@@ -4087,6 +4506,7 @@
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "direct_consumers": [
         "fla/ops/gated_delta_rule/backends/triton_ascend/gate.py",
         "fla/ops/gated_delta_rule/fused_recurrent.py",
@@ -4106,17 +4526,20 @@
         "softplus2_nv",
         "softplus2_triton"
       ],
+      "migration_decision": null,
       "tests": []
     },
     {
-      "consumer_count": 2,
+      "consumer_count": 3,
       "conversion": {
         "cute_files": [
           "fla/ops/backends/cute/solve_tril.py"
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "direct_consumers": [
+        "fla/ops/delta_rule/chunk.py",
         "fla/ops/delta_rule/wy_fast.py",
         "fla/ops/path_attn/parallel.py"
       ],
@@ -4130,6 +4553,7 @@
         "merge_16x16_to_32x32_inverse_kernel",
         "merge_16x16_to_64x64_inverse_kernel"
       ],
+      "migration_decision": null,
       "tests": [
         "tests/ops/test_solve_tril.py"
       ]
@@ -4142,6 +4566,7 @@
         ],
         "status": "present_unverified"
       },
+      "coverage_status": "present_unverified",
       "direct_consumers": [
         "fla/ops/common/intracard_cp.py",
         "fla/ops/gated_delta_rule/chunk.py",
@@ -4159,6 +4584,7 @@
         "merge_fwd_bwd_kernel",
         "pre_process_bwd_kernel_merged"
       ],
+      "migration_decision": null,
       "tests": [
         "tests/context_parallel/test_cp_bwd_gk_offset.py"
       ]
@@ -4167,8 +4593,8 @@
   "summary": {
     "benchmark_gaps": 49,
     "benchmark_registered": 16,
-    "cute_public_missing": 62,
-    "cute_public_present_unverified": 3,
+    "cute_public_missing": 20,
+    "cute_public_present_unverified": 45,
     "cute_shared_missing": 2,
     "cute_shared_present_unverified": 20,
     "domain_test_gaps": [
@@ -4176,7 +4602,18 @@
       "rebased.parallel_rebased",
       "rwkv4.fused_recurrent_rwkv4"
     ],
+    "migration_decision_deprecated": 2,
+    "migration_decision_no_go": 22,
+    "public_coverage_deprecated": 2,
+    "public_coverage_missing": 0,
+    "public_coverage_no_go": 18,
+    "public_coverage_present_unverified": 45,
     "public_optimized_entry_points": 65,
+    "shared_coverage_deprecated": 0,
+    "shared_coverage_missing": 0,
+    "shared_coverage_no_go": 2,
+    "shared_coverage_not_applicable_platform": 9,
+    "shared_coverage_present_unverified": 20,
     "shared_kernel_files": 31,
     "symbol_test_gaps": [
       "abc.chunk_abc",
@@ -4188,6 +4625,7 @@
       "rebased.parallel_rebased",
       "rwkv4.fused_recurrent_rwkv4",
       "rwkv7.fused_recurrent_rwkv7"
-    ]
+    ],
+    "true_missing_ids": []
   }
 }
