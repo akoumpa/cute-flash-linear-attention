@@ -113,3 +113,10 @@ if IS_NVIDIA:
 else:
     softplus = softplus_triton
     softplus2 = softplus2_triton
+
+
+def get_cute_softplus():
+    """Return native CuTe softplus helpers without importing CuTe on Triton-only hosts."""
+    from fla.ops.backends.cute.softplus import softplus2_cute, softplus_cute
+
+    return softplus_cute, softplus2_cute
