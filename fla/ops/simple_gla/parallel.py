@@ -28,6 +28,47 @@ triton_config = {'grf_mode': 'large'} if IS_INTEL_ALCHEMIST else {}
 NUM_WARPS = [2, 4, 8] if IS_NVIDIA_HOPPER else [2, 4, 8, 16]
 
 
+def _can_use_cute_parallel_simple_gla(
+    q: torch.Tensor,
+    k: torch.Tensor,
+    v: torch.Tensor,
+    g: torch.Tensor | None,
+    scale: float,
+    output_attentions: bool,
+    cu_seqlens: torch.LongTensor | None,
+    chunk_indices: torch.LongTensor | None,
+) -> bool:
+    if (
+        torch.compiler.is_compiling()
+        or output_attentions
+        or cu_seqlens is not None
+        or chunk_indices is not None
+        or not q.is_cuda
+        or q.dtype not in (torch.float16, torch.bfloat16)
+        or not (q.dtype == k.dtype == v.dtype)
+        or not (q.device == k.device == v.device)
+        or q.ndim != 4
+        or q.shape != k.shape
+        or q.shape != v.shape
+        or q.shape[1] != 16
+        or q.shape[-1] != 16
+        or q.shape[0] * q.shape[2] < 8
+        or not all(tensor.is_contiguous() for tensor in (q, k, v))
+        or not isinstance(scale, int | float)
+    ):
+        return False
+    if g is not None and (
+        g.shape != q.shape[:3]
+        or g.dtype != torch.float32
+        or g.device != q.device
+        or not g.is_contiguous()
+    ):
+        return False
+    from fla.ops.backends.cute.runtime import is_cute_dsl_available
+
+    return is_cute_dsl_available()
+
+
 @triton.heuristics({
     'NV': lambda args: triton.cdiv(args['V'], args['BV']),
     'OUTPUT_ATTENTIONS': lambda args: args['attn'] is not None,
@@ -519,6 +560,10 @@ def parallel_simple_gla_fwd(
             cu_seqlens=cu_seqlens,
             chunk_indices=chunk_indices,
         )
+    if _can_use_cute_parallel_simple_gla(q, k, v, g, scale, output_attentions, cu_seqlens, chunk_indices):
+        from fla.ops.backends.cute.parallel_simple_gla import parallel_simple_gla_fwd_cute
+
+        return parallel_simple_gla_fwd_cute(q=q, k=k, v=v, g=g, scale=scale), g, None
     grid = (NK * NV, NT, B * H)
     o = torch.empty(NK, *v.shape, dtype=v.dtype if NK == 1 else torch.float, device=q.device)
     attn = q.new_zeros(NK, B, H, T, T) if output_attentions else None
