@@ -27,6 +27,8 @@ def _compile_fused_recurrent_fwd(
     *,
     use_gate: bool,
     use_gate_gamma: bool,
+    use_gate_k: bool,
+    use_gate_v: bool,
     use_initial_state: bool,
     store_final_state: bool,
 ):
@@ -85,19 +87,28 @@ def _compile_fused_recurrent_fwd(
                     token = (Int64(batch) * T + pos) * H + head
                     qk_base = token * K
                     v_base = token * V
+                    decay = Float32(0.0)
+                    if const_expr(use_gate):
+                        decay = Float32(mG[token])
+                    elif const_expr(use_gate_gamma):
+                        decay = Float32(mG[head])
+                    elif const_expr(use_gate_v):
+                        decay = Float32(mG[v_base + v_idx])
                     decay = (
-                        Float32(mG[token])
-                        if const_expr(use_gate)
-                        else (Float32(mG[head]) if const_expr(use_gate_gamma) else Float32(0.0))
+                        cute.math.exp(decay, fastmath=False)
+                        if const_expr(use_gate or use_gate_gamma or use_gate_v)
+                        else Float32(1.0)
                     )
-                    decay = cute.math.exp(decay, fastmath=False) if const_expr(use_gate or use_gate_gamma) else Float32(1.0)
                     value = Float32(mV[v_base + v_idx])
                     output = Float32(0.0)
 
                     for k_idx in cutlass.range_constexpr(K):
                         key = Float32(mK[qk_base + k_idx])
                         query = Float32(mQ[qk_base + k_idx]) * scale
-                        state[k_idx] = state[k_idx] * decay + key * value
+                        key_decay = (
+                            cute.math.exp(Float32(mG[qk_base + k_idx]), fastmath=False) if const_expr(use_gate_k) else decay
+                        )
+                        state[k_idx] = state[k_idx] * key_decay + key * value
                         output += state[k_idx] * query
 
                     mO[v_base + v_idx] = output
@@ -111,7 +122,7 @@ def _compile_fused_recurrent_fwd(
     v_fake = cute.runtime.make_fake_tensor(input_dtype, (cute.sym_int(),), stride=(1,), assumed_align=16)
     gate_fake = (
         cute.runtime.make_fake_tensor(gate_dtype, (cute.sym_int(),), stride=(1,), assumed_align=16)
-        if use_gate or use_gate_gamma
+        if use_gate or use_gate_gamma or use_gate_k or use_gate_v
         else None
     )
     output_fake = cute.runtime.make_fake_tensor(Float32, (cute.sym_int(),), stride=(1,), assumed_align=16)
@@ -145,6 +156,8 @@ def fused_recurrent_fwd_cute(
     v: torch.Tensor,
     g: torch.Tensor | None,
     g_gamma: torch.Tensor | None,
+    gk: torch.Tensor | None,
+    gv: torch.Tensor | None,
     scale: float,
     initial_state: torch.Tensor | None,
     output_final_state: bool,
@@ -154,13 +167,16 @@ def fused_recurrent_fwd_cute(
     V = v.shape[-1]
     o_partial = q.new_empty(1, *v.shape, dtype=torch.float32)
     ht = q.new_empty(B, H, K, V, dtype=torch.float32) if output_final_state else None
+    gate = g if g is not None else (g_gamma if g_gamma is not None else (gk if gk is not None else gv))
     compiled = _compile_fused_recurrent_fwd(
         _torch_to_cute_dtype(q.dtype),
-        _torch_to_cute_dtype((g if g is not None else g_gamma).dtype) if g is not None or g_gamma is not None else None,
+        _torch_to_cute_dtype(gate.dtype) if gate is not None else None,
         K,
         V,
         use_gate=g is not None,
         use_gate_gamma=g_gamma is not None,
+        use_gate_k=gk is not None,
+        use_gate_v=gv is not None,
         use_initial_state=initial_state is not None,
         store_final_state=output_final_state,
     )
@@ -168,7 +184,7 @@ def fused_recurrent_fwd_cute(
         q.view(-1),
         k.view(-1),
         v.view(-1),
-        (g if g is not None else g_gamma).view(-1) if g is not None or g_gamma is not None else None,
+        gate.view(-1) if gate is not None else None,
         o_partial.view(-1),
         initial_state.view(-1) if initial_state is not None else None,
         ht.view(-1) if ht is not None else None,
