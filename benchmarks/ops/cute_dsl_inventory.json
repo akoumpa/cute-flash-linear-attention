@@ -3514,8 +3514,10 @@
     {
       "consumer_count": 5,
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/chunk_h.py"
+        ],
+        "status": "present_unverified"
       },
       "direct_consumers": [
         "fla/ops/gla/chunk.py",
@@ -3538,8 +3540,10 @@
     {
       "consumer_count": 0,
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/chunk_h_parallel.py"
+        ],
+        "status": "present_unverified"
       },
       "direct_consumers": [],
       "file": "fla/ops/common/chunk_h_parallel.py",
@@ -3558,8 +3562,10 @@
     {
       "consumer_count": 0,
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/chunk_h_split.py"
+        ],
+        "status": "present_unverified"
       },
       "direct_consumers": [],
       "file": "fla/ops/common/chunk_h_split.py",
@@ -3630,8 +3636,10 @@
     {
       "consumer_count": 1,
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/fused_chunk.py"
+        ],
+        "status": "present_unverified"
       },
       "direct_consumers": [
         "fla/ops/simple_gla/fused_chunk.py"
@@ -3736,8 +3744,10 @@
     {
       "consumer_count": 0,
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/csr.py"
+        ],
+        "status": "present_unverified"
       },
       "direct_consumers": [],
       "file": "fla/ops/utils/csr.py",
@@ -3823,8 +3833,10 @@
     {
       "consumer_count": 1,
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/logcumsumexp.py"
+        ],
+        "status": "present_unverified"
       },
       "direct_consumers": [
         "fla/ops/abc/chunk.py"
@@ -3861,8 +3873,10 @@
     {
       "consumer_count": 0,
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/matmul.py"
+        ],
+        "status": "present_unverified"
       },
       "direct_consumers": [],
       "file": "fla/ops/utils/matmul.py",
@@ -3882,8 +3896,10 @@
     {
       "consumer_count": 76,
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/op.py"
+        ],
+        "status": "present_unverified"
       },
       "direct_consumers": [
         "fla/ops/abc/chunk.py",
@@ -4110,8 +4126,10 @@
     {
       "consumer_count": 5,
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/cp_chunk_delta_h.py"
+        ],
+        "status": "present_unverified"
       },
       "direct_consumers": [
         "fla/ops/common/intracard_cp.py",
@@ -4140,8 +4158,8 @@
     "benchmark_registered": 16,
     "cute_public_missing": 65,
     "cute_public_present_unverified": 0,
-    "cute_shared_missing": 22,
-    "cute_shared_present_unverified": 9,
+    "cute_shared_missing": 13,
+    "cute_shared_present_unverified": 18,
     "domain_test_gaps": [
       "abc.chunk_abc",
       "rebased.parallel_rebased",

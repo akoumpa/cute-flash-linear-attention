@@ -240,7 +240,13 @@ def _shared_internals(repo_root: Path, test_files: list[Path]) -> list[dict[str,
                 and f"from {module} import" in candidate.read_text(errors="ignore")
             )
             is_platform_backend = "backends" in path.relative_to(ops_root).parts
-            cute_files = [] if is_platform_backend else _native_cute_files(repo_root, module_stem=path.stem)
+            if is_platform_backend:
+                cute_files = []
+            else:
+                cute_files = sorted(
+                    set(_native_cute_files(repo_root, module_stem=path.stem))
+                    | set(_native_cute_files(repo_root, module_stem=f"{namespace.replace('/', '_')}_{path.stem}"))
+                )
             records.append(
                 {
                     "id": module.removeprefix("fla.ops."),
