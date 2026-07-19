@@ -4008,8 +4008,10 @@
     {
       "consumer_count": 2,
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/pooling.py"
+        ],
+        "status": "present_unverified"
       },
       "direct_consumers": [
         "fla/ops/nsa/naive.py",
@@ -4132,8 +4134,8 @@
     "benchmark_registered": 16,
     "cute_public_missing": 65,
     "cute_public_present_unverified": 0,
-    "cute_shared_missing": 26,
-    "cute_shared_present_unverified": 5,
+    "cute_shared_missing": 25,
+    "cute_shared_present_unverified": 6,
     "domain_test_gaps": [
       "abc.chunk_abc",
       "rebased.parallel_rebased",
