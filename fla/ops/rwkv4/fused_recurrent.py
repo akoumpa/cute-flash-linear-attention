@@ -26,7 +26,7 @@ def _can_use_cute_rwkv4_forward(w: Tensor, u: Tensor, k: Tensor, v: Tensor, stat
         or u.dtype not in _CUTE_DTYPES
         or k.dtype != u.dtype
         or v.dtype != u.dtype
-        or state.dtype not in _CUTE_DTYPES
+        or state.dtype != u.dtype
         or w.ndim != 1
         or u.ndim != 1
         or k.ndim != 3
@@ -54,7 +54,7 @@ def _can_use_cute_rwkv4_backward(w, u, k, v, state, grad_wkv, grad_state) -> boo
         or u.dtype not in _CUTE_DTYPES
         or k.dtype != u.dtype
         or v.dtype != u.dtype
-        or state.dtype not in _CUTE_DTYPES
+        or state.dtype != u.dtype
         or w.shape != (C,)
         or u.shape != (C,)
         or v.shape != k.shape

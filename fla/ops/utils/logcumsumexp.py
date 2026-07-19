@@ -24,7 +24,7 @@ _USE_FAST_OPS = os.environ.get("FLA_USE_FAST_OPS", "0") == "1"
 
 
 def _can_use_cute_logcumsumexp(s: torch.Tensor) -> bool:
-    if s.ndim < 2 or not s.is_cuda or not s.is_contiguous():
+    if torch.compiler.is_compiling() or s.ndim < 2 or not s.is_cuda or not s.is_contiguous():
         return False
     if s.dtype not in (torch.float16, torch.bfloat16, torch.float32):
         return False
