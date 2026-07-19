@@ -15,6 +15,7 @@ build
 dist
 *.egg-info
 dist-packages/*
+compiled_cache.db
 
 # experimental results
 exp
