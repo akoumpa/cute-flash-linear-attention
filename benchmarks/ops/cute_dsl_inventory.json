@@ -1100,8 +1100,10 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/oja.py"
+        ],
+        "status": "present_unverified"
       },
       "domain": "gated_oja_rule",
       "domain_test_present": true,
@@ -1710,8 +1712,10 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/hgrn.py"
+        ],
+        "status": "present_unverified"
       },
       "domain": "hgrn",
       "domain_test_present": true,
@@ -2671,8 +2675,10 @@
       "benchmark_registered": false,
       "benchmark_targets": [],
       "conversion": {
-        "cute_files": [],
-        "status": "missing"
+        "cute_files": [
+          "fla/ops/backends/cute/rwkv4.py"
+        ],
+        "status": "present_unverified"
       },
       "domain": "rwkv4",
       "domain_test_present": false,
@@ -4161,8 +4167,8 @@
   "summary": {
     "benchmark_gaps": 49,
     "benchmark_registered": 16,
-    "cute_public_missing": 65,
-    "cute_public_present_unverified": 0,
+    "cute_public_missing": 62,
+    "cute_public_present_unverified": 3,
     "cute_shared_missing": 2,
     "cute_shared_present_unverified": 20,
     "domain_test_gaps": [

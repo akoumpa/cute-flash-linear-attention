@@ -90,19 +90,29 @@ def _native_cute_files(
     domain: str | None = None,
     module_stem: str | None = None,
     symbol: str | None = None,
+    source_file: Path | None = None,
 ) -> list[str]:
     candidates: list[Path] = []
+    direct_candidates: set[Path] = set()
     if domain is not None:
         candidates.extend((repo_root / "fla/ops" / domain / "backends/cute").glob("*.py"))
         candidates.append(repo_root / "fla/ops/backends/cute" / f"{domain}.py")
     if module_stem is not None:
         candidates.append(repo_root / "fla/ops/backends/cute" / f"{module_stem}.py")
+    if source_file is not None:
+        source_text = source_file.read_text(errors="ignore")
+        for module in re.findall(r"from fla\.ops\.backends\.cute\.([\w.]+) import", source_text):
+            if module == "runtime":
+                continue
+            path = repo_root.joinpath("fla", "ops", "backends", "cute", *module.split(".")).with_suffix(".py")
+            candidates.append(path)
+            direct_candidates.add(path)
     return sorted(
         str(path.relative_to(repo_root))
         for path in set(candidates)
         if path.is_file()
         and "cutlass.cute" in (text := path.read_text(errors="ignore"))
-        and (symbol is None or re.search(rf"\b{re.escape(symbol)}\b", text))
+        and (path in direct_candidates or symbol is None or re.search(rf"\b{re.escape(symbol)}\b", text))
     )
 
 
@@ -177,6 +187,7 @@ def _public_ops(repo_root: Path, registry: list[dict[str, Any]], test_files: lis
                 domain=domain_dir.name,
                 module_stem=source_file.stem,
                 symbol=symbol,
+                source_file=source_file,
             )
             symbol_tests = _symbol_tests(test_files, symbol, repo_root)
             records.append(
