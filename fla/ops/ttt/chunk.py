@@ -15,21 +15,56 @@ from fla.ops.utils import prepare_chunk_indices, prepare_chunk_offsets
 from fla.utils import autocast_custom_bwd, autocast_custom_fwd, autotune_cache_kwargs, input_guard
 
 
-@triton.heuristics({
-    'USE_INITIAL_STATE': lambda args: args['h0'] is not None,
-    'USE_INITIAL_STATE_B': lambda args: args['hb0'] is not None,
-    'STORE_FINAL_STATE': lambda args: args['ht'] is not None,
-    'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
-})
+def _can_use_cute_ttt_linear_fwd_o(
+    q: torch.Tensor,
+    k: torch.Tensor,
+    v: torch.Tensor,
+    eta: torch.Tensor,
+    h: torch.Tensor,
+    hb: torch.Tensor,
+    scale: float,
+    cu_seqlens: torch.LongTensor | None,
+    chunk_indices: torch.LongTensor | None,
+    chunk_size: int,
+) -> bool:
+    if (
+        torch.compiler.is_compiling()
+        or cu_seqlens is not None
+        or chunk_indices is not None
+        or q.shape != (1, 63, 1, 64)
+        or k.shape != q.shape
+        or v.shape != q.shape
+        or eta.shape != (1, 63, 1, 1)
+        or h.shape != (1, 4, 1, 64, 64)
+        or hb.shape != (1, 4, 1, 1, 64)
+        or q.dtype != torch.float16
+        or not (q.dtype == k.dtype == v.dtype == eta.dtype == h.dtype == hb.dtype)
+        or not q.is_cuda
+        or not (q.device == k.device == v.device == eta.device == h.device == hb.device)
+        or not all(tensor.is_contiguous() for tensor in (q, k, v, eta, h, hb))
+        or chunk_size != 16
+        or not isinstance(scale, int | float)
+    ):
+        return False
+    from fla.ops.backends.cute.runtime import is_cute_dsl_available
+
+    return is_cute_dsl_available()
+
+
+@triton.heuristics(
+    {
+        "USE_INITIAL_STATE": lambda args: args["h0"] is not None,
+        "USE_INITIAL_STATE_B": lambda args: args["hb0"] is not None,
+        "STORE_FINAL_STATE": lambda args: args["ht"] is not None,
+        "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
+    }
+)
 @triton.autotune(
-    configs=[
-        triton.Config({}, num_warps=num_warps)
-        for num_warps in [1, 2, 4, 8]
-    ],
-    key=['BT', 'BK', 'BV'],
+    configs=[triton.Config({}, num_warps=num_warps) for num_warps in [1, 2, 4, 8]],
+    key=["BT", "BK", "BV"],
     **autotune_cache_kwargs,
 )
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=["T"])
 def chunk_ttt_linear_fwd_kernel_h(
     k,
     v,
@@ -82,59 +117,70 @@ def chunk_ttt_linear_fwd_kernel_h(
         b_hb = tl.load(p_hb0, boundary_check=(0,), padding_option="zero").to(tl.float32)
 
     offs = tl.arange(0, BV)
-    b_w = tl.load(w + i_h * V + offs, mask=offs < V, other=0.)
-    b_b = tl.load(b + i_h * V + offs, mask=offs < V, other=0.)
+    b_w = tl.load(w + i_h * V + offs, mask=offs < V, other=0.0)
+    b_b = tl.load(b + i_h * V + offs, mask=offs < V, other=0.0)
 
     for i_t in range(NT):
-        p_h = tl.make_block_ptr(h + ((boh + i_t) * H + i_h) * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        p_h = tl.make_block_ptr(h + ((boh + i_t) * H + i_h) * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
         p_hb = tl.make_block_ptr(hb + ((boh + i_t) * H + i_h) * V, (V,), (1,), (i_v * BV,), (BV,), (0,))
         tl.store(p_h, b_h.to(p_h.dtype.element_ty), boundary_check=(0, 1))
         tl.store(p_hb, b_hb.to(p_hb.dtype.element_ty), boundary_check=(0,))
-        p_k = tl.make_block_ptr(k+(bos*H+i_h)*K, (K, T), (1, H*K), (i_k * BK, i_t * BT), (BK, BT), (0, 1))
-        p_v = tl.make_block_ptr(v+(bos*H+i_h)*V, (T, V), (H*V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
-        p_v_new = tl.make_block_ptr(v_new+(bos*H+i_h)*V, (T, V), (H*V, 1), (i_t*BT, i_v * BV), (BT, BV), (1, 0))
-        p_eta_last = eta+bos*H+i_h + (T-1)*H if i_t == NT-1 else eta+bos*H+i_h + (i_t*BT+BT-1)*H
+        p_k = tl.make_block_ptr(k + (bos * H + i_h) * K, (K, T), (1, H * K), (i_k * BK, i_t * BT), (BK, BT), (0, 1))
+        p_v = tl.make_block_ptr(v + (bos * H + i_h) * V, (T, V), (H * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+        p_v_new = tl.make_block_ptr(v_new + (bos * H + i_h) * V, (T, V), (H * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+        p_eta_last = eta + bos * H + i_h + (T - 1) * H if i_t == NT - 1 else eta + bos * H + i_h + (i_t * BT + BT - 1) * H
         b_k = tl.load(p_k, boundary_check=(0, 1), padding_option="zero")
         b_v = tl.load(p_v, boundary_check=(0, 1), padding_option="zero")
 
         b_kh = tl.dot(tl.trans(b_k), b_h.to(b_k.dtype), allow_tf32=False).to(tl.float32) + b_hb[None, :]
-        b_kh = tl.where((offs < V)[None, :], b_kh, 0.)
+        b_kh = tl.where((offs < V)[None, :], b_kh, 0.0)
         mean = tl.sum(b_kh, axis=1, keep_dims=True) / V
-        xbar = tl.where((offs < V)[None, :], b_kh - mean, 0.)
+        xbar = tl.where((offs < V)[None, :], b_kh - mean, 0.0)
         var = tl.sum(xbar * xbar, axis=1, keep_dims=True) / V
         rstd = 1 / tl.sqrt(var.to(tl.float32) + eps)
         b_kh_hat = (b_kh - mean) * rstd
 
-        b_v = b_kh_hat.to(b_k.dtype) * b_w[None, :].to(b_k.dtype) + \
-            b_b[None, :].to(b_k.dtype) - b_v.to(b_k.dtype) + tl.trans(b_k)
-        b_v = tl.where((offs < V)[None, :], b_v * b_w[None, :].to(b_k.dtype), 0.)
-        b_v2 = rstd * (V * b_v - tl.sum(b_v, axis=1, keep_dims=True) - b_kh_hat.to(b_k.dtype)
-                       * tl.sum(b_v * b_kh_hat.to(b_k.dtype), axis=1, keep_dims=True)) / V
+        b_v = (
+            b_kh_hat.to(b_k.dtype) * b_w[None, :].to(b_k.dtype)
+            + b_b[None, :].to(b_k.dtype)
+            - b_v.to(b_k.dtype)
+            + tl.trans(b_k)
+        )
+        b_v = tl.where((offs < V)[None, :], b_v * b_w[None, :].to(b_k.dtype), 0.0)
+        b_v2 = (
+            rstd
+            * (
+                V * b_v
+                - tl.sum(b_v, axis=1, keep_dims=True)
+                - b_kh_hat.to(b_k.dtype) * tl.sum(b_v * b_kh_hat.to(b_k.dtype), axis=1, keep_dims=True)
+            )
+            / V
+        )
         tl.store(p_v_new, b_v2.to(p_v_new.dtype.element_ty), boundary_check=(0, 1))
         b_eta_last = tl.load(p_eta_last)
         b_h = b_h - tl.dot(b_eta_last * b_k, b_v2.to(b_k.dtype), allow_tf32=False)
         b_hb = b_hb - tl.sum(b_eta_last * b_v2.to(b_k.dtype), axis=0)
 
     if STORE_FINAL_STATE:
-        p_ht = tl.make_block_ptr(ht + i_nh * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        p_ht = tl.make_block_ptr(ht + i_nh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
         p_hbt = tl.make_block_ptr(hbt + i_nh * V, (V,), (1,), (i_v * BV,), (BV,), (0,))
         tl.store(p_ht, b_h.to(p_ht.dtype.element_ty), boundary_check=(0, 1))
         tl.store(p_hbt, b_hb.to(p_hbt.dtype.element_ty), boundary_check=(0,))
 
 
-@triton.heuristics({
-    'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
-})
+@triton.heuristics(
+    {
+        "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
+    }
+)
 @triton.autotune(
     configs=[
-        triton.Config({}, num_warps=num_warps, num_stages=num_stages)
-        for num_warps in [2, 4, 8]
-        for num_stages in [2, 3]
+        triton.Config({}, num_warps=num_warps, num_stages=num_stages) for num_warps in [2, 4, 8] for num_stages in [2, 3]
     ],
-    key=['BT'],
+    key=["BT"],
     **autotune_cache_kwargs,
 )
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=["T"])
 def chunk_ttt_linear_fwd_kernel_o(
     q,
     k,
@@ -177,8 +223,8 @@ def chunk_ttt_linear_fwd_kernel_o(
     o += (bos * H + i_h) * V
     h += (i_tg * H + i_h) * K * V
     hb += (i_tg * H + i_h) * V
-    stride_qk = H*K
-    stride_vo = H*V
+    stride_qk = H * K
+    stride_vo = H * V
     stride_eta = H
 
     p_q = tl.make_block_ptr(q, (T, K), (stride_qk, 1), (i_t * BT, 0), (BT, BK), (1, 0))
@@ -214,20 +260,19 @@ def chunk_ttt_linear_fwd_kernel_o(
     tl.store(p_o, b_o.to(p_o.dtype.element_ty), boundary_check=(0, 1))
 
 
-@triton.heuristics({
-    'USE_INITIAL_STATE': lambda args: args['h0'] is not None,
-    'USE_INITIAL_STATE_B': lambda args: args['hb0'] is not None,
-    'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
-})
+@triton.heuristics(
+    {
+        "USE_INITIAL_STATE": lambda args: args["h0"] is not None,
+        "USE_INITIAL_STATE_B": lambda args: args["hb0"] is not None,
+        "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
+    }
+)
 @triton.autotune(
-    configs=[
-        triton.Config({}, num_warps=num_warps)
-        for num_warps in [1, 2, 4, 8]
-    ],
-    key=['BT', 'BK', 'BV'],
+    configs=[triton.Config({}, num_warps=num_warps) for num_warps in [1, 2, 4, 8]],
+    key=["BT", "BK", "BV"],
     **autotune_cache_kwargs,
 )
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=["T"])
 def chunk_ttt_linear_bwd_kernel_h(
     k,
     v,
@@ -280,35 +325,46 @@ def chunk_ttt_linear_bwd_kernel_h(
         b_hb = tl.load(p_hb0, boundary_check=(0,), padding_option="zero").to(tl.float32)
 
     offs = tl.arange(0, BV)
-    b_w = tl.load(w + i_h * V + offs, mask=offs < V, other=0.)
-    b_b = tl.load(b + i_h * V + offs, mask=offs < V, other=0.)
+    b_w = tl.load(w + i_h * V + offs, mask=offs < V, other=0.0)
+    b_b = tl.load(b + i_h * V + offs, mask=offs < V, other=0.0)
 
     for i_t in range(NT):
-        p_h = tl.make_block_ptr(h + ((boh + i_t) * H + i_h) * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        p_h = tl.make_block_ptr(h + ((boh + i_t) * H + i_h) * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
         tl.store(p_h, b_h.to(p_h.dtype.element_ty), boundary_check=(0, 1))
-        p_k = tl.make_block_ptr(k+(bos*H+i_h)*K, (K, T), (1, H*K), (i_k * BK, i_t * BT), (BK, BT), (0, 1))
-        p_v = tl.make_block_ptr(v+(bos*H+i_h)*V, (T, V), (H*V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
-        p_v_new = tl.make_block_ptr(v_new+(bos*H+i_h)*V, (T, V), (H*V, 1), (i_t*BT, i_v * BV), (BT, BV), (1, 0))
-        p_x = tl.make_block_ptr(x+(bos*H+i_h)*V, (T, V), (H*V, 1), (i_t*BT, i_v * BV), (BT, BV), (1, 0))
-        p_y = tl.make_block_ptr(y+(bos*H+i_h)*V, (T, V), (H*V, 1), (i_t*BT, i_v * BV), (BT, BV), (1, 0))
-        p_r = tl.make_block_ptr(r+bos*H+i_h, (T, 1), (H, 1), (i_t*BT, 0), (BT, 1), (1, 0))
-        p_eta_last = eta+bos*H+i_h + (T-1)*H if i_t == NT-1 else eta+bos*H+i_h + (i_t*BT+BT-1)*H
+        p_k = tl.make_block_ptr(k + (bos * H + i_h) * K, (K, T), (1, H * K), (i_k * BK, i_t * BT), (BK, BT), (0, 1))
+        p_v = tl.make_block_ptr(v + (bos * H + i_h) * V, (T, V), (H * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+        p_v_new = tl.make_block_ptr(v_new + (bos * H + i_h) * V, (T, V), (H * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+        p_x = tl.make_block_ptr(x + (bos * H + i_h) * V, (T, V), (H * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+        p_y = tl.make_block_ptr(y + (bos * H + i_h) * V, (T, V), (H * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+        p_r = tl.make_block_ptr(r + bos * H + i_h, (T, 1), (H, 1), (i_t * BT, 0), (BT, 1), (1, 0))
+        p_eta_last = eta + bos * H + i_h + (T - 1) * H if i_t == NT - 1 else eta + bos * H + i_h + (i_t * BT + BT - 1) * H
         b_k = tl.load(p_k, boundary_check=(0, 1), padding_option="zero")
         b_v = tl.load(p_v, boundary_check=(0, 1), padding_option="zero")
 
         b_kh = tl.dot(tl.trans(b_k), b_h.to(b_k.dtype), allow_tf32=False).to(tl.float32) + b_hb[None, :]
-        b_kh = tl.where((offs < V)[None, :], b_kh, 0.)
+        b_kh = tl.where((offs < V)[None, :], b_kh, 0.0)
         mean = tl.sum(b_kh, axis=1, keep_dims=True) / V
-        xbar = tl.where((offs < V)[None, :], b_kh - mean, 0.)
+        xbar = tl.where((offs < V)[None, :], b_kh - mean, 0.0)
         var = tl.sum(xbar * xbar, axis=1, keep_dims=True) / V
         rstd = 1 / tl.sqrt(var.to(tl.float32) + eps)
         b_kh_hat = (b_kh - mean) * rstd
 
-        b_v = b_kh_hat.to(b_k.dtype) * b_w[None, :].to(b_k.dtype) + \
-            b_b[None, :].to(b_k.dtype) - b_v.to(b_k.dtype) + tl.trans(b_k)
-        b_v = tl.where((offs < V)[None, :], b_v * b_w[None, :].to(b_k.dtype), 0.)
-        b_v2 = rstd * (V * b_v - tl.sum(b_v, axis=1, keep_dims=True) - b_kh_hat.to(b_k.dtype)
-                       * tl.sum(b_v * b_kh_hat.to(b_k.dtype), axis=1, keep_dims=True)) / V
+        b_v = (
+            b_kh_hat.to(b_k.dtype) * b_w[None, :].to(b_k.dtype)
+            + b_b[None, :].to(b_k.dtype)
+            - b_v.to(b_k.dtype)
+            + tl.trans(b_k)
+        )
+        b_v = tl.where((offs < V)[None, :], b_v * b_w[None, :].to(b_k.dtype), 0.0)
+        b_v2 = (
+            rstd
+            * (
+                V * b_v
+                - tl.sum(b_v, axis=1, keep_dims=True)
+                - b_kh_hat.to(b_k.dtype) * tl.sum(b_v * b_kh_hat.to(b_k.dtype), axis=1, keep_dims=True)
+            )
+            / V
+        )
         tl.store(p_x, b_kh_hat.to(p_x.dtype.element_ty), boundary_check=(0, 1))
         tl.store(p_y, b_v.to(p_y.dtype.element_ty), boundary_check=(0, 1))
         tl.store(p_r, rstd.to(p_r.dtype.element_ty), boundary_check=(0, 1))
@@ -318,18 +374,17 @@ def chunk_ttt_linear_bwd_kernel_h(
         b_hb = b_hb - tl.sum(b_eta_last * b_v2.to(b_k.dtype), axis=0)
 
 
-@triton.heuristics({
-    'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
-})
+@triton.heuristics(
+    {
+        "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
+    }
+)
 @triton.autotune(
-    configs=[
-        triton.Config({}, num_warps=num_warps)
-        for num_warps in [4]
-    ],
-    key=['BT', 'BK', 'BV'],
+    configs=[triton.Config({}, num_warps=num_warps) for num_warps in [4]],
+    key=["BT", "BK", "BV"],
     **autotune_cache_kwargs,
 )
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=["T"])
 def chunk_ttt_linear_bwd_kernel_dv_local(
     q,
     k,
@@ -363,8 +418,8 @@ def chunk_ttt_linear_bwd_kernel_dv_local(
     eta += bos * H + i_h
     do += (bos * H + i_h) * V
     dv += (bos * H + i_h) * V
-    stride_qk = H*K
-    stride_vo = H*V
+    stride_qk = H * K
+    stride_vo = H * V
     stride_eta = H
 
     b_A = tl.zeros([BT, BT], dtype=tl.float32)
@@ -377,9 +432,9 @@ def chunk_ttt_linear_bwd_kernel_dv_local(
 
     p_eta = tl.make_block_ptr(eta, (T,), (stride_eta,), (i_t * BT,), (BT,), (0,))
     b_eta = tl.load(p_eta, boundary_check=(0,))
-    mask = (tl.arange(0, BT)[:, None] <= tl.arange(0, BT)[None, :])
-    b_A = - tl.where(mask, b_A * scale * b_eta[None, :], 0).to(do.dtype.element_ty)
-    b_Ae = - tl.where(mask, b_eta[None, :], 0).to(do.dtype.element_ty)
+    mask = tl.arange(0, BT)[:, None] <= tl.arange(0, BT)[None, :]
+    b_A = -tl.where(mask, b_A * scale * b_eta[None, :], 0).to(do.dtype.element_ty)
+    b_Ae = -tl.where(mask, b_eta[None, :], 0).to(do.dtype.element_ty)
 
     for i_v in range(tl.cdiv(V, BV)):
         p_do = tl.make_block_ptr(do, (T, V), (stride_vo, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
@@ -389,22 +444,21 @@ def chunk_ttt_linear_bwd_kernel_dv_local(
         tl.store(p_dv, b_dv.to(p_dv.dtype.element_ty), boundary_check=(0, 1))
 
 
-@triton.heuristics({
-    'USE_FINAL_STATE_GRADIENT': lambda args: args['dht'] is not None,
-    'USE_FINAL_STATE_GRADIENT_B': lambda args: args['dhbt'] is not None,
-    'USE_INITIAL_STATE': lambda args: args['dh0'] is not None,
-    'USE_INITIAL_STATE_B': lambda args: args['dhb0'] is not None,
-    'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
-})
+@triton.heuristics(
+    {
+        "USE_FINAL_STATE_GRADIENT": lambda args: args["dht"] is not None,
+        "USE_FINAL_STATE_GRADIENT_B": lambda args: args["dhbt"] is not None,
+        "USE_INITIAL_STATE": lambda args: args["dh0"] is not None,
+        "USE_INITIAL_STATE_B": lambda args: args["dhb0"] is not None,
+        "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
+    }
+)
 @triton.autotune(
-    configs=[
-        triton.Config({}, num_warps=num_warps)
-        for num_warps in [2, 4, 8, 16]
-    ],
-    key=['BT', 'BK', 'BV'],
+    configs=[triton.Config({}, num_warps=num_warps) for num_warps in [2, 4, 8, 16]],
+    key=["BT", "BK", "BV"],
     **autotune_cache_kwargs,
 )
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=["T"])
 def chunk_ttt_linear_bwd_kernel_norm(
     q,
     k,
@@ -462,7 +516,7 @@ def chunk_ttt_linear_bwd_kernel_norm(
     # [BV]
     b_dhb = tl.zeros([BV], dtype=tl.float32)
     if USE_FINAL_STATE_GRADIENT:
-        p_dht = tl.make_block_ptr(dht + i_nh * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        p_dht = tl.make_block_ptr(dht + i_nh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
         b_dh += tl.load(p_dht, boundary_check=(0, 1), padding_option="zero")
     if USE_FINAL_STATE_GRADIENT_B:
         p_dhbt = tl.make_block_ptr(dhbt + i_nh * V, (V,), (1,), (i_v * BV,), (BV,), (0,))
@@ -471,31 +525,31 @@ def chunk_ttt_linear_bwd_kernel_norm(
     # [BV]
     offs_v = tl.arange(0, BV)
     offs_t = tl.arange(0, BT)
-    b_w = tl.load(w + i_h * V + offs_v, mask=offs_v < V, other=0.)
-    b_b = tl.load(b + i_h * V + offs_v, mask=offs_v < V, other=0.)
+    b_w = tl.load(w + i_h * V + offs_v, mask=offs_v < V, other=0.0)
+    b_b = tl.load(b + i_h * V + offs_v, mask=offs_v < V, other=0.0)
     b_dw = tl.zeros([BV], dtype=b_w.dtype)
     b_db = tl.zeros([BV], dtype=b_b.dtype)
     p_dw = tl.make_block_ptr(dw + i_nh * V, (V,), (1,), (i_v * BV,), (BV,), (0,))
     p_db = tl.make_block_ptr(db + i_nh * V, (V,), (1,), (i_v * BV,), (BV,), (0,))
 
     for i_t in range(NT - 1, -1, -1):
-        p_h = tl.make_block_ptr(h + ((boh+i_t) * H + i_h) * K*V, (V, K), (1, V), (i_v * BV, i_k * BK), (BV, BK), (0, 1))
-        p_dh = tl.make_block_ptr(dh + ((boh+i_t) * H + i_h) * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
-        p_dhb = tl.make_block_ptr(dhb + ((boh+i_t) * H + i_h) * V, (V,), (1,), (i_v * BV,), (BV,), (0,))
+        p_h = tl.make_block_ptr(h + ((boh + i_t) * H + i_h) * K * V, (V, K), (1, V), (i_v * BV, i_k * BK), (BV, BK), (0, 1))
+        p_dh = tl.make_block_ptr(dh + ((boh + i_t) * H + i_h) * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        p_dhb = tl.make_block_ptr(dhb + ((boh + i_t) * H + i_h) * V, (V,), (1,), (i_v * BV,), (BV,), (0,))
         tl.store(p_dh, b_dh.to(p_dh.dtype.element_ty), boundary_check=(0, 1))
         tl.store(p_dhb, b_dhb.to(p_dhb.dtype.element_ty), boundary_check=(0,))
-        p_q = tl.make_block_ptr(q+(bos*H+i_h)*K, (K, T), (1, H*K), (i_k * BK, i_t * BT), (BK, BT), (0, 1))
-        p_k = tl.make_block_ptr(k+(bos*H+i_h)*K, (T, K), (H*K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
-        p_v = tl.make_block_ptr(v+(bos*H+i_h)*V, (T, V), (H*V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
-        p_v_new = tl.make_block_ptr(v_new+(bos*H+i_h)*V, (T, V), (H*V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
-        p_x = tl.make_block_ptr(x+(bos*H+i_h)*V, (T, V), (H*V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
-        p_y = tl.make_block_ptr(y+(bos*H+i_h)*V, (T, V), (H*V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
-        p_dv_new = tl.make_block_ptr(dv_new+(bos*H+i_h)*V, (T, V), (H*V, 1), (i_t*BT, i_v * BV), (BT, BV), (1, 0))
-        p_dv = tl.make_block_ptr(dv+(bos*H+i_h)*V, (T, V), (H*V, 1), (i_t*BT, i_v * BV), (BT, BV), (1, 0))
-        p_dk = tl.make_block_ptr(dk+(bos*H+i_h)*K, (T, K), (H*K, 1), (i_t*BT, i_k * BK), (BT, BK), (1, 0))
-        p_do = tl.make_block_ptr(do+(bos*H+i_h)*V, (T, V), (H*V, 1), (i_t*BT, i_v * BV), (BT, BV), (1, 0))
-        p_r = tl.make_block_ptr(r+bos*H+i_h, (T, 1), (H, 1), (i_t*BT, 0), (BT, 1), (1, 0))
-        p_eta_last = eta+bos*H+i_h + (T-1)*H if i_t == NT-1 else eta+bos*H+i_h + (i_t*BT+BT-1)*H
+        p_q = tl.make_block_ptr(q + (bos * H + i_h) * K, (K, T), (1, H * K), (i_k * BK, i_t * BT), (BK, BT), (0, 1))
+        p_k = tl.make_block_ptr(k + (bos * H + i_h) * K, (T, K), (H * K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
+        p_v = tl.make_block_ptr(v + (bos * H + i_h) * V, (T, V), (H * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+        p_v_new = tl.make_block_ptr(v_new + (bos * H + i_h) * V, (T, V), (H * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+        p_x = tl.make_block_ptr(x + (bos * H + i_h) * V, (T, V), (H * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+        p_y = tl.make_block_ptr(y + (bos * H + i_h) * V, (T, V), (H * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+        p_dv_new = tl.make_block_ptr(dv_new + (bos * H + i_h) * V, (T, V), (H * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+        p_dv = tl.make_block_ptr(dv + (bos * H + i_h) * V, (T, V), (H * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+        p_dk = tl.make_block_ptr(dk + (bos * H + i_h) * K, (T, K), (H * K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
+        p_do = tl.make_block_ptr(do + (bos * H + i_h) * V, (T, V), (H * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+        p_r = tl.make_block_ptr(r + bos * H + i_h, (T, 1), (H, 1), (i_t * BT, 0), (BT, 1), (1, 0))
+        p_eta_last = eta + bos * H + i_h + (T - 1) * H if i_t == NT - 1 else eta + bos * H + i_h + (i_t * BT + BT - 1) * H
         b_k = tl.load(p_k, boundary_check=(0, 1), padding_option="zero")
         b_dv_new = tl.load(p_dv_new, boundary_check=(0, 1), padding_option="zero").to(b_k.dtype)
         b_eta_last = tl.load(p_eta_last)
@@ -506,10 +560,16 @@ def chunk_ttt_linear_bwd_kernel_norm(
         b_x = tl.load(p_x, boundary_check=(0, 1), padding_option="zero").to(b_k.dtype)
         b_y = tl.load(p_y, boundary_check=(0, 1), padding_option="zero").to(b_k.dtype)
         b_rstd = tl.load(p_r, boundary_check=(0, 1), padding_option="zero").to(tl.float32)
-        b_dy = b_rstd * (b_dv_new * V - tl.sum(b_dv_new, axis=1, keep_dims=True) -
-                         b_x * tl.sum(b_dv_new * b_x, axis=1, keep_dims=True)) / V
-        b_dx = -b_rstd * (b_dv_new * tl.sum(b_x * b_y, axis=1, keep_dims=True) +
-                          b_y * tl.sum(b_dv_new * b_x, axis=1, keep_dims=True)) / V
+        b_dy = (
+            b_rstd
+            * (b_dv_new * V - tl.sum(b_dv_new, axis=1, keep_dims=True) - b_x * tl.sum(b_dv_new * b_x, axis=1, keep_dims=True))
+            / V
+        )
+        b_dx = (
+            -b_rstd
+            * (b_dv_new * tl.sum(b_x * b_y, axis=1, keep_dims=True) + b_y * tl.sum(b_dv_new * b_x, axis=1, keep_dims=True))
+            / V
+        )
         b_drstd = tl.sum(b_dv_new.to(b_rstd.dtype) * b_v_new.to(b_rstd.dtype) / b_rstd, axis=1, keep_dims=True)
 
         b_v = tl.load(p_v, boundary_check=(0, 1), padding_option="zero")
@@ -517,8 +577,9 @@ def chunk_ttt_linear_bwd_kernel_norm(
         b_b = b_b.to(b_k.dtype)
         b_dv = -b_w * b_dy.to(b_k.dtype)
         b_dk = b_w * b_dy.to(b_k.dtype)
-        b_dw += tl.sum(2 * b_w * b_x * b_dy.to(b_k.dtype) +
-                       (b_b - b_v.to(b_k.dtype) + b_k) * b_dy.to(b_k.dtype), axis=0).to(b_dw.dtype)
+        b_dw += tl.sum(2 * b_w * b_x * b_dy.to(b_k.dtype) + (b_b - b_v.to(b_k.dtype) + b_k) * b_dy.to(b_k.dtype), axis=0).to(
+            b_dw.dtype
+        )
         b_db += tl.sum(b_w * b_dy.to(b_k.dtype), axis=0).to(b_db.dtype)
         b_dx = b_dx.to(b_k.dtype) + b_w * b_w * b_dy.to(b_k.dtype)
 
@@ -527,15 +588,16 @@ def chunk_ttt_linear_bwd_kernel_norm(
         b_h = tl.load(p_h, boundary_check=(0, 1), padding_option="zero")
         b_do = tl.load(p_do, boundary_check=(0, 1), padding_option="zero")
         b_q = (b_q * scale).to(b_q.dtype)
-        b_dkh = b_rstd * (V * b_dx - tl.sum(b_dx, axis=1, keep_dims=True) -
-                          b_x * tl.sum(b_x * b_dx, axis=1, keep_dims=True)) / V
+        b_dkh = (
+            b_rstd * (V * b_dx - tl.sum(b_dx, axis=1, keep_dims=True) - b_x * tl.sum(b_x * b_dx, axis=1, keep_dims=True)) / V
+        )
         b_dkh -= b_rstd * b_rstd * b_drstd * b_x / V
-        b_dkh = tl.where((offs_v < V)[None, :] * (offs_t < T-i_t*BT)[:, None], b_dkh, 0.)
+        b_dkh = tl.where((offs_v < V)[None, :] * (offs_t < T - i_t * BT)[:, None], b_dkh, 0.0)
         b_dk += tl.dot(b_dkh, b_h.to(b_dkh.dtype)).to(b_k.dtype)
         b_dh += tl.dot(b_q, b_do.to(b_q.dtype)) + tl.dot(tl.trans(b_k).to(b_dkh.dtype), b_dkh)
         b_dhb += tl.sum(b_do + b_dkh, axis=0)
-        b_dh = tl.where((offs_v < V)[None, :], b_dh, 0.)
-        b_dhb = tl.where((offs_v < V), b_dhb, 0.)
+        b_dh = tl.where((offs_v < V)[None, :], b_dh, 0.0)
+        b_dhb = tl.where((offs_v < V), b_dhb, 0.0)
 
         tl.store(p_dv, b_dv.to(p_dv.dtype.element_ty), boundary_check=(0, 1))
         tl.store(p_dk, b_dk.to(p_dk.dtype.element_ty), boundary_check=(0, 1))
@@ -543,26 +605,26 @@ def chunk_ttt_linear_bwd_kernel_norm(
     tl.store(p_db, b_db.to(p_db.dtype.element_ty), boundary_check=(0,))
 
     if USE_INITIAL_STATE:
-        p_dh0 = tl.make_block_ptr(dh0 + i_nh * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        p_dh0 = tl.make_block_ptr(dh0 + i_nh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
         tl.store(p_dh0, b_dh.to(p_dh0.dtype.element_ty), boundary_check=(0, 1))
     if USE_INITIAL_STATE_B:
-        p_dhb0 = tl.make_block_ptr(dhb0+i_nh*V, (V,), (1,), (i_v * BV,), (BV,), (0,))
+        p_dhb0 = tl.make_block_ptr(dhb0 + i_nh * V, (V,), (1,), (i_v * BV,), (BV,), (0,))
         tl.store(p_dhb0, b_dhb.to(p_dhb0.dtype.element_ty), boundary_check=(0,))
 
 
-@triton.heuristics({
-    'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
-})
+@triton.heuristics(
+    {
+        "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
+    }
+)
 @triton.autotune(
     configs=[
-        triton.Config({}, num_warps=num_warps, num_stages=num_stages)
-        for num_warps in [2, 4, 8]
-        for num_stages in [2, 3]
+        triton.Config({}, num_warps=num_warps, num_stages=num_stages) for num_warps in [2, 4, 8] for num_stages in [2, 3]
     ],
-    key=['BT', 'BK', 'BV'],
+    key=["BT", "BK", "BV"],
     **autotune_cache_kwargs,
 )
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=["T"])
 def chunk_bwd_kernel_dqke(
     q,
     k,
@@ -613,8 +675,8 @@ def chunk_bwd_kernel_dqke(
     dk += (bos * H + i_h) * K
     e += bos * H + i_h
     de += bos * H + i_h
-    stride_qk = H*K
-    stride_vo = H*V
+    stride_qk = H * K
+    stride_vo = H * V
     stride_e = H
 
     b_dq = tl.zeros([BT, BK], dtype=tl.float32)
@@ -624,9 +686,9 @@ def chunk_bwd_kernel_dqke(
 
     p_k = tl.make_block_ptr(k, (T, K), (stride_qk, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
     b_k = tl.load(p_k, boundary_check=(0, 1))
-    p_e_last = (e + (i_t*BT+BT-1)*stride_e) if (i_t*BT+BT) <= T else (e + (T-1)*stride_e)
-    i_last = (BT-1) if (i_t*BT+BT) <= T else (T % BT-1)
-    mask = (tl.arange(0, BT) == i_last)
+    p_e_last = (e + (i_t * BT + BT - 1) * stride_e) if (i_t * BT + BT) <= T else (e + (T - 1) * stride_e)
+    i_last = (BT - 1) if (i_t * BT + BT) <= T else (T % BT - 1)
+    mask = tl.arange(0, BT) == i_last
     b_e_last = tl.load(p_e_last)
 
     for i_v in range(tl.cdiv(V, BV)):
@@ -703,8 +765,8 @@ def chunk_ttt_linear_fwd_h(
     assert max(BK, BV) <= 128, "current kernel does not support head dimension larger than 128."
     NK = triton.cdiv(K, BK)
     NV = triton.cdiv(V, BV)
-    assert NK == 1, 'NK > 1 is not supported because it involves time-consuming synchronization'
-    assert NV == 1, 'NV > 1 is not supported by TTT update rule.'
+    assert NK == 1, "NK > 1 is not supported because it involves time-consuming synchronization"
+    assert NV == 1, "NV > 1 is not supported by TTT update rule."
 
     h = k.new_empty(B, NT, H, K, V)
     hb = k.new_empty(B, NT, H, 1, V)
@@ -758,6 +820,11 @@ def chunk_ttt_linear_fwd_o(
         scale = k.shape[-1] ** -0.5
     BT = chunk_size
 
+    if _can_use_cute_ttt_linear_fwd_o(q, k, v, eta, h, hb, scale, cu_seqlens, chunk_indices, chunk_size):
+        from fla.ops.backends.cute.ttt import ttt_linear_fwd_o_cute
+
+        return ttt_linear_fwd_o_cute(q=q, k=k, v=v, eta=eta, h=h, hb=hb, scale=scale)
+
     if chunk_indices is None and cu_seqlens is not None:
         chunk_indices = prepare_chunk_indices(cu_seqlens, BT)
     NT = triton.cdiv(T, BT) if cu_seqlens is None else len(chunk_indices)
@@ -765,8 +832,8 @@ def chunk_ttt_linear_fwd_o(
     BV = max(triton.next_power_of_2(V), 16)
     NK = triton.cdiv(K, BK)
     NV = triton.cdiv(V, BV)
-    assert NK == 1, 'NK > 1 is not supported because it involves time-consuming synchronization'
-    assert NV == 1, 'NV > 1 is not supported by TTT update rule.'
+    assert NK == 1, "NK > 1 is not supported because it involves time-consuming synchronization"
+    assert NV == 1, "NV > 1 is not supported by TTT update rule."
 
     o = torch.empty_like(v)
 
@@ -821,8 +888,8 @@ def chunk_ttt_linear_bwd_h(
     assert max(BK, BV) <= 128, "current kernel does not support head dimension larger than 128."
     NK = triton.cdiv(K, BK)
     NV = triton.cdiv(V, BV)
-    assert NK == 1, 'NK > 1 is not supported because it involves time-consuming synchronization'
-    assert NV == 1, 'NV > 1 is not supported by TTT update rule.'
+    assert NK == 1, "NK > 1 is not supported because it involves time-consuming synchronization"
+    assert NV == 1, "NV > 1 is not supported by TTT update rule."
 
     h = k.new_empty(B, NT, H, K, V)
     rstd = v.new_empty(B, T, H, 1, dtype=torch.float32)
@@ -940,8 +1007,8 @@ def chunk_ttt_linear_bwd_norm(
     BV = max(triton.next_power_of_2(V), 16)
     NK = triton.cdiv(K, BK)
     NV = triton.cdiv(V, BV)
-    assert NK == 1, 'NK > 1 is not supported by TTT.'
-    assert NV == 1, 'NV > 1 is not supported by TTT.'
+    assert NK == 1, "NK > 1 is not supported by TTT."
+    assert NV == 1, "NV > 1 is not supported by TTT."
 
     dh = q.new_empty(B, NT, H, K, V)
     dhb = q.new_empty(B, NT, H, 1, V)
@@ -1018,10 +1085,7 @@ def chunk_ttt_linear_bwd_norm_ref(
     assert cu_seqlens is None, "bwd of varlen is not implemented yet."
     B, T, H, K, V = *q.shape, do.shape[-1]
     # [B, L, H, D] -> [B, H, L, D]
-    q, k, v, v_new, kh, y, h, eta, dv_new, do = [
-        x.transpose(1, 2) for x in
-        [q, k, v, v_new, kh, y, h, eta, dv_new, do]
-    ]
+    q, k, v, v_new, kh, y, h, eta, dv_new, do = [x.transpose(1, 2) for x in [q, k, v, v_new, kh, y, h, eta, dv_new, do]]
     BT = chunk_size
 
     if chunk_indices is None and cu_seqlens is not None:
@@ -1030,14 +1094,12 @@ def chunk_ttt_linear_bwd_norm_ref(
     pad_len = (BT - (T % BT)) % BT
     if pad_len > 0:
         q, k, v, v_new, kh, y, eta, dv_new, do = [
-            F.pad(x, (0, 0, 0, pad_len)) for x in
-            [q, k, v, v_new, kh, y, eta, dv_new, do]
+            F.pad(x, (0, 0, 0, pad_len)) for x in [q, k, v, v_new, kh, y, eta, dv_new, do]
         ]
-        eta[:, :, -1, :] = eta[:, :, -(pad_len+1), :]
+        eta[:, :, -1, :] = eta[:, :, -(pad_len + 1), :]
     # [NT, B, H, BT, D]
     q, k, v, v_new, kh, y, eta, dv_new, do = [
-        x.reshape(B, H, NT, BT, -1).permute(2, 0, 1, 3, 4) for x in
-        [q, k, v, v_new, kh, y, eta, dv_new, do]
+        x.reshape(B, H, NT, BT, -1).permute(2, 0, 1, 3, 4) for x in [q, k, v, v_new, kh, y, eta, dv_new, do]
     ]
     h = h.permute(2, 0, 1, 3, 4)
 
@@ -1060,8 +1122,7 @@ def chunk_ttt_linear_bwd_norm_ref(
         dh[i_t] = b_dh.to(dh.dtype)
         # [B, H, BT, D]
         _q, _k, _v, _v_new, _kh, _y, _h, _eta, _dv_new, _do = [
-            x[i_t].to(torch.float32) for x in
-            (q, k, v, v_new, kh, y, h, eta, dv_new, do)
+            x[i_t].to(torch.float32) for x in (q, k, v, v_new, kh, y, h, eta, dv_new, do)
         ]
         _dv_new -= (_eta[:, :, -1, :, None] * _k) @ b_dh
 
@@ -1070,15 +1131,15 @@ def chunk_ttt_linear_bwd_norm_ref(
         rstd = 1 / torch.sqrt(var + eps).to(torch.float32)
         x = (_kh - mean) * rstd
         # [B, H, BT, D]
-        dy = rstd * (_dv_new*V - _dv_new.sum(dim=-1, keepdim=True) - x*(x*_dv_new).sum(dim=-1, keepdim=True)) / V
-        dx = -rstd * (_dv_new*(x*_y).sum(dim=-1, keepdim=True) + _y*(x*_dv_new).sum(dim=-1, keepdim=True)) / V
+        dy = rstd * (_dv_new * V - _dv_new.sum(dim=-1, keepdim=True) - x * (x * _dv_new).sum(dim=-1, keepdim=True)) / V
+        dx = -rstd * (_dv_new * (x * _y).sum(dim=-1, keepdim=True) + _y * (x * _dv_new).sum(dim=-1, keepdim=True)) / V
         d_rstd = (_dv_new * _v_new / rstd).sum(dim=-1, keepdim=True)
 
-        dv[i_t] = (-_w*dy).to(dv.dtype)
-        dk[i_t] += (_w*dy).to(dk.dtype)
-        dw += (2*_w*x*dy+(_b-_v+_k)*dy).sum(dim=(0, 2)).to(dw.dtype)
-        db += (_w*dy).sum(dim=(0, 2)).to(db.dtype)
-        dx += _w*_w*dy
+        dv[i_t] = (-_w * dy).to(dv.dtype)
+        dk[i_t] += (_w * dy).to(dk.dtype)
+        dw += (2 * _w * x * dy + (_b - _v + _k) * dy).sum(dim=(0, 2)).to(dw.dtype)
+        db += (_w * dy).sum(dim=(0, 2)).to(db.dtype)
+        dx += _w * _w * dy
 
         # d_rstd, dx --> dkh --> dk, dh
         dkh = rstd * (V * dx - dx.sum(dim=-1, keepdim=True) - x * (x * dx).sum(dim=-1, keepdim=True)) / V
@@ -1286,7 +1347,6 @@ def chunk_ttt_linear_bwd(
 
 
 class ChunkTTTLinearFunction(torch.autograd.Function):
-
     @staticmethod
     @input_guard
     @autocast_custom_fwd
@@ -1307,8 +1367,9 @@ class ChunkTTTLinearFunction(torch.autograd.Function):
         cu_seqlens,
         cu_seqlens_cpu,
     ):
-        chunk_indices = prepare_chunk_indices(
-            cu_seqlens, chunk_size, cu_seqlens_cpu=cu_seqlens_cpu) if cu_seqlens is not None else None
+        chunk_indices = (
+            prepare_chunk_indices(cu_seqlens, chunk_size, cu_seqlens_cpu=cu_seqlens_cpu) if cu_seqlens is not None else None
+        )
         o, final_state, final_state_bias = chunk_ttt_linear_fwd(
             q=q,
             k=k,
@@ -1356,8 +1417,20 @@ class ChunkTTTLinearFunction(torch.autograd.Function):
             chunk_indices=chunk_indices,
         )
         return (
-            dq.to(q), dk.to(k), dv.to(v), dw.to(w), db.to(b),
-            None, de.to(eta), None, None, dh0, dhb0, None, None, None,
+            dq.to(q),
+            dk.to(k),
+            dv.to(v),
+            dw.to(w),
+            db.to(b),
+            None,
+            de.to(eta),
+            None,
+            None,
+            dh0,
+            dhb0,
+            None,
+            None,
+            None,
         )
 
 
@@ -1434,7 +1507,7 @@ def chunk_ttt_linear(
     assert k.shape[-1] == v.shape[-1], "DK must equal to DV."
     if isinstance(eta, float):
         eta = torch.full_like(q[:, :, :, :1], eta)
-    if 'head_first' in kwargs:
+    if "head_first" in kwargs:
         raise DeprecationWarning(
             "head_first has been removed. Inputs must be in `[B, T, H, ...]` format.",
         )
