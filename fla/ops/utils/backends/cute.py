@@ -22,9 +22,7 @@ class CuteUtilsBackend(BaseBackend):
         return is_cute_dsl_available()
 
     @staticmethod
-    def _verify_vector(s: torch.Tensor, cu_seqlens, output_dtype) -> tuple[bool, str | None]:
-        if cu_seqlens is not None:
-            return False, "the first CuTe cumsum slice supports dense tensors only"
+    def _verify_vector(s: torch.Tensor, output_dtype) -> tuple[bool, str | None]:
         if s.ndim != 4:
             return False, "the first CuTe cumsum slice supports vector tensors only"
         if not s.is_cuda or not s.is_contiguous():
@@ -45,7 +43,9 @@ class CuteUtilsBackend(BaseBackend):
         head_first=False,
         output_dtype=torch.float,
     ):
-        can_use, reason = self._verify_vector(s, cu_seqlens, output_dtype)
+        if cu_seqlens is not None:
+            return False, "the CuTe global cumsum path does not yet support ragged tensors"
+        can_use, reason = self._verify_vector(s, output_dtype)
         if not can_use:
             return can_use, reason
         time_dim = 2 if head_first else 1
@@ -85,7 +85,21 @@ class CuteUtilsBackend(BaseBackend):
         chunk_indices=None,
         **kwargs,
     ):
-        return self._verify_vector(g, cu_seqlens, output_dtype)
+        can_use, reason = self._verify_vector(g, output_dtype)
+        if not can_use:
+            return can_use, reason
+        if cu_seqlens is not None and cu_seqlens.dtype not in (torch.int32, torch.int64):
+            return False, f"unsupported cu_seqlens dtype {cu_seqlens.dtype}"
+        if chunk_indices is not None and chunk_indices.dtype not in (torch.int32, torch.int64):
+            return False, f"unsupported chunk_indices dtype {chunk_indices.dtype}"
+        if cu_seqlens is not None and (not cu_seqlens.is_cuda or not cu_seqlens.is_contiguous()):
+            return False, "CuTe cumsum requires contiguous CUDA cu_seqlens"
+        if chunk_indices is not None:
+            if not chunk_indices.is_cuda or not chunk_indices.is_contiguous():
+                return False, "CuTe cumsum requires contiguous CUDA chunk_indices"
+            if cu_seqlens is not None and chunk_indices.dtype != cu_seqlens.dtype:
+                return False, "cu_seqlens and chunk_indices must have the same dtype"
+        return True, None
 
     def chunk_local_cumsum(
         self,
@@ -99,7 +113,23 @@ class CuteUtilsBackend(BaseBackend):
         chunk_indices=None,
         **kwargs,
     ):
-        from fla.ops.backends.cute.cumsum import dense_vector_cumsum_cute
+        from fla.ops.backends.cute.cumsum import dense_vector_cumsum_cute, varlen_local_vector_cumsum_cute
+
+        if cu_seqlens is not None:
+            if chunk_indices is None:
+                from fla.ops.utils.index import prepare_chunk_indices
+
+                chunk_indices = prepare_chunk_indices(cu_seqlens, chunk_size)
+            return varlen_local_vector_cumsum_cute(
+                g,
+                cu_seqlens,
+                chunk_indices,
+                chunk_size=chunk_size,
+                reverse=reverse,
+                scale=scale,
+                head_first=head_first,
+                output_dtype=output_dtype,
+            )
 
         return dense_vector_cumsum_cute(
             g,
