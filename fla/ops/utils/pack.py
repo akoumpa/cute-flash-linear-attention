@@ -8,6 +8,8 @@
 # Code adapted from https://github.com/mayank31398/cute-kernels
 
 
+import math
+
 import torch
 import triton
 import triton.language as tl
@@ -17,11 +19,8 @@ from fla.utils import autotune_cache_kwargs, input_guard
 
 
 @triton.autotune(
-    configs=[
-        triton.Config({}, num_warps=num_warps)
-        for num_warps in [4, 8, 16, 32]
-    ],
-    key=['D', 'PADDING_SIDE', 'PACK'],
+    configs=[triton.Config({}, num_warps=num_warps) for num_warps in [4, 8, 16, 32]],
+    key=["D", "PADDING_SIDE", "PACK"],
     **autotune_cache_kwargs,
 )
 @triton.jit
@@ -39,7 +38,7 @@ def packunpack_sequence_kernel(
     bos, eos = tl.load(cu_seqlens + i_b), tl.load(cu_seqlens + i_b + 1)
 
     T = eos - bos
-    if PADDING_SIDE == 'left':
+    if PADDING_SIDE == "left":
         NP = S - T
         if i_s < NP:
             return
@@ -61,6 +60,21 @@ def packunpack_sequence_kernel(
 
 
 def pack_sequence_fwdbwd(
+    x: torch.Tensor,
+    cu_seqlens: torch.Tensor,
+    padding_side: str,
+) -> torch.Tensor:
+    from fla.ops.backends.cute import is_cute_dsl_available
+
+    if is_cute_dsl_available() and x.dtype in (torch.float16, torch.bfloat16, torch.float32):
+        from fla.ops.backends.cute.pack import pack_sequence_fwdbwd_cute
+
+        return pack_sequence_fwdbwd_cute(x, cu_seqlens, padding_side)
+
+    return _pack_sequence_fwdbwd_triton(x, cu_seqlens, padding_side)
+
+
+def _pack_sequence_fwdbwd_triton(
     x: torch.Tensor,
     cu_seqlens: torch.Tensor,
     padding_side: str,
@@ -92,6 +106,24 @@ def unpack_sequence_fwdbwd(
 ) -> torch.Tensor:
     if desired_shape is None:
         desired_shape = (len(cu_seqlens) - 1, prepare_lens(cu_seqlens).max().item(), *x.shape[1:])
+    from fla.ops.backends.cute import is_cute_dsl_available
+
+    width = math.prod(desired_shape[2:])
+    use_cute = not (x.dtype == torch.float32 and width >= 8192)
+    if use_cute and is_cute_dsl_available() and x.dtype in (torch.float16, torch.bfloat16, torch.float32):
+        from fla.ops.backends.cute.pack import unpack_sequence_fwdbwd_cute
+
+        return unpack_sequence_fwdbwd_cute(x, cu_seqlens, padding_side, desired_shape)
+
+    return _unpack_sequence_fwdbwd_triton(x, cu_seqlens, padding_side, desired_shape)
+
+
+def _unpack_sequence_fwdbwd_triton(
+    x: torch.Tensor,
+    cu_seqlens: torch.Tensor,
+    padding_side: str,
+    desired_shape: torch.Size,
+) -> torch.Tensor:
     y = torch.zeros(desired_shape, device=x.device, dtype=x.dtype)
     B, S = y.shape[:2]
     D = y.numel() // (B * S)
@@ -112,7 +144,6 @@ def unpack_sequence_fwdbwd(
 
 
 class PackSequenceFunction(torch.autograd.Function):
-
     @staticmethod
     @input_guard
     def forward(
@@ -121,7 +152,7 @@ class PackSequenceFunction(torch.autograd.Function):
         cu_seqlens: torch.Tensor,
         padding_side: str,
     ) -> torch.Tensor:
-        assert padding_side in ['left', 'right']
+        assert padding_side in ["left", "right"]
         assert x.ndim >= 2
 
         ctx.cu_seqlens = cu_seqlens
@@ -148,7 +179,6 @@ class PackSequenceFunction(torch.autograd.Function):
 
 
 class UnpackSequenceFunction(torch.autograd.Function):
-
     @staticmethod
     @input_guard
     def forward(
@@ -158,7 +188,7 @@ class UnpackSequenceFunction(torch.autograd.Function):
         padding_side: str,
         desired_shape: torch.Size | None = None,
     ) -> torch.Tensor:
-        assert padding_side in ['left', 'right']
+        assert padding_side in ["left", "right"]
         assert x.ndim >= 2
         if desired_shape is not None:
             assert desired_shape[0] == cu_seqlens.shape[0] - 1
@@ -189,7 +219,7 @@ class UnpackSequenceFunction(torch.autograd.Function):
 def pack_sequence(
     x: torch.Tensor,
     cu_seqlens: torch.Tensor,
-    padding_side: str = 'left',
+    padding_side: str = "left",
 ) -> torch.Tensor:
     return PackSequenceFunction.apply(
         x,
@@ -201,7 +231,7 @@ def pack_sequence(
 def unpack_sequence(
     x: torch.Tensor,
     cu_seqlens: torch.Tensor,
-    padding_side: str = 'left',
+    padding_side: str = "left",
     desired_shape: torch.Size | None = None,
 ) -> torch.Tensor:
     return UnpackSequenceFunction.apply(

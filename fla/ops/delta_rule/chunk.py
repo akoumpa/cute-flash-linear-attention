@@ -10,9 +10,38 @@ import torch
 from fla.modules.l2norm import l2norm_bwd, l2norm_fwd
 from fla.ops.common.chunk_delta_h import chunk_gated_delta_rule_bwd_dhu, chunk_gated_delta_rule_fwd_h
 from fla.ops.common.chunk_o import chunk_bwd_dqkwg, chunk_bwd_dv_local, chunk_fwd_o
+from fla.ops.common.chunk_scaled_dot_kkt import chunk_scaled_dot_kkt_fwd
 from fla.ops.delta_rule.wy_fast import prepare_wy_repr_bwd, prepare_wy_repr_fwd, recompute_w_u_fwd
 from fla.ops.utils.index import prepare_chunk_indices
+from fla.ops.utils.solve_tril import solve_tril
 from fla.utils import autocast_custom_bwd, autocast_custom_fwd, input_guard
+
+
+def _can_use_cute_delta_rule_wy(k, v, beta, cu_seqlens, chunk_indices, chunk_size):
+    if (
+        cu_seqlens is not None
+        or chunk_indices is not None
+        or chunk_size != 16
+        or not k.is_cuda
+        or k.dtype not in (torch.float16, torch.bfloat16)
+        or k.dtype != v.dtype
+        or k.dtype != beta.dtype
+        or k.device != v.device
+        or k.device != beta.device
+        or k.ndim != 4
+        or v.shape != k.shape
+        or beta.shape != k.shape[:3]
+        or not k.is_contiguous()
+        or not v.is_contiguous()
+        or not beta.is_contiguous()
+    ):
+        return False
+    B, T, H, K = k.shape
+    if B < 1 or H < 1 or B * H < 2 or T != 64 or K != 32:
+        return False
+    from fla.ops.backends.cute.runtime import is_cute_dsl_available
+
+    return is_cute_dsl_available()
 
 
 def chunk_delta_rule_fwd(
@@ -28,14 +57,28 @@ def chunk_delta_rule_fwd(
     chunk_size: int = 64,
 ):
     # obtain WY representation. u is actually the new v.
-    w, u, A = prepare_wy_repr_fwd(
-        k=k,
-        v=v,
-        beta=beta,
-        cu_seqlens=cu_seqlens,
-        chunk_indices=chunk_indices,
-        chunk_size=chunk_size,
-    )
+    if _can_use_cute_delta_rule_wy(k, v, beta, cu_seqlens, chunk_indices, chunk_size):
+        from fla.ops.backends.cute.delta_rule_wy import delta_rule_wy_recompute_cute
+
+        A = chunk_scaled_dot_kkt_fwd(
+            k=k,
+            beta=beta,
+            cu_seqlens=None,
+            chunk_size=chunk_size,
+            output_dtype=torch.float32,
+            chunk_indices=None,
+        )
+        A = solve_tril(A=A, output_dtype=k.dtype)
+        w, u = delta_rule_wy_recompute_cute(k, v, beta, A)
+    else:
+        w, u, A = prepare_wy_repr_fwd(
+            k=k,
+            v=v,
+            beta=beta,
+            cu_seqlens=cu_seqlens,
+            chunk_indices=chunk_indices,
+            chunk_size=chunk_size,
+        )
     h, v_new, final_state = chunk_gated_delta_rule_fwd_h(
         k=k,
         w=w,
@@ -149,7 +192,6 @@ def chunk_delta_rule_bwd(
 
 
 class ChunkDeltaRuleFunction(torch.autograd.Function):
-
     @staticmethod
     @input_guard
     @autocast_custom_fwd
@@ -173,8 +215,9 @@ class ChunkDeltaRuleFunction(torch.autograd.Function):
         else:
             q_rstd, k_rstd = None, None
 
-        chunk_indices = prepare_chunk_indices(
-            cu_seqlens, chunk_size, cu_seqlens_cpu=cu_seqlens_cpu) if cu_seqlens is not None else None
+        chunk_indices = (
+            prepare_chunk_indices(cu_seqlens, chunk_size, cu_seqlens_cpu=cu_seqlens_cpu) if cu_seqlens is not None else None
+        )
         o, A, final_state = chunk_delta_rule_fwd(
             q=q,
             k=k,
@@ -303,11 +346,11 @@ def chunk_delta_rule(
     assert q.dtype != torch.float32, "ChunkDeltaRuleFunction does not support float32. Please use bfloat16."
     assert len(beta.shape) == 3, "beta must be of shape (batch size, num of head, seq len)."
 
-    if 'head_first' in kwargs:
+    if "head_first" in kwargs:
         raise DeprecationWarning(
             "head_first has been removed. Inputs must be in `[B, T, H, ...]` format.",
         )
-    chunk_size = kwargs.pop('chunk_size', 64)
+    chunk_size = kwargs.pop("chunk_size", 64)
     if chunk_size not in (16, 32, 64):
         raise ValueError(f"`chunk_size` must be 16, 32, or 64, got {chunk_size}.")
     if cu_seqlens is not None:

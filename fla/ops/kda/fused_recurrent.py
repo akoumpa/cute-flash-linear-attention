@@ -18,6 +18,79 @@ from fla.ops.utils.softplus import softplus
 from fla.utils import input_guard
 
 
+def _can_use_cute_kda(
+    q,
+    k,
+    v,
+    g,
+    beta,
+    initial_state,
+    use_qk_l2norm_in_kernel,
+    use_gate_in_kernel,
+    use_beta_sigmoid_in_kernel,
+    allow_neg_eigval,
+    lower_bound,
+    state_v_first,
+    cu_seqlens,
+):
+    if (
+        torch.is_grad_enabled()
+        or use_qk_l2norm_in_kernel
+        or use_gate_in_kernel
+        or use_beta_sigmoid_in_kernel
+        or allow_neg_eigval
+        or lower_bound is not None
+        or state_v_first
+        or cu_seqlens is not None
+        or not q.is_cuda
+        or q.dtype not in (torch.float16, torch.bfloat16)
+        or q.dtype != k.dtype
+        or q.dtype != v.dtype
+        or q.ndim != 4
+        or k.ndim != 4
+        or v.ndim != 4
+    ):
+        return False
+    B, T, H, K = q.shape
+    HV, V = v.shape[2:]
+    if (
+        B < 1
+        or not 1 <= T <= 8
+        or H < 1
+        or HV < H
+        or HV % H != 0
+        or B * HV < 4
+        or K != 32
+        or V != 32
+        or k.shape != q.shape
+        or v.shape != (B, T, HV, V)
+        or g.shape != (B, T, HV, K)
+        or beta.shape != (B, T, HV)
+        or g.dtype not in (torch.float16, torch.bfloat16, torch.float32)
+        or beta.dtype not in (torch.float16, torch.bfloat16, torch.float32)
+        or q.device != k.device
+        or q.device != v.device
+        or q.device != g.device
+        or q.device != beta.device
+        or not q.is_contiguous()
+        or not k.is_contiguous()
+        or not v.is_contiguous()
+        or not g.is_contiguous()
+        or not beta.is_contiguous()
+    ):
+        return False
+    if initial_state is not None and (
+        initial_state.shape != (B, HV, K, V)
+        or initial_state.dtype != torch.float32
+        or initial_state.device != q.device
+        or not initial_state.is_contiguous()
+    ):
+        return False
+    from fla.ops.backends.cute.runtime import is_cute_dsl_available
+
+    return is_cute_dsl_available()
+
+
 @triton.heuristics(
     {
         "USE_INITIAL_STATE": lambda args: args["h0"] is not None,
@@ -128,13 +201,7 @@ def fused_recurrent_kda_fwd_kernel(
                 i_t = tl.load(num_accepted_tokens + i_n).to(tl.int64) - 1
             else:
                 i_t = 0
-            p_h0 = (
-                h0
-                + tl.load(ssm_state_indices + i_n * stride_indices_seq + i_t).to(
-                    tl.int64
-                )
-                * stride_init_state_token
-            )
+            p_h0 = h0 + tl.load(ssm_state_indices + i_n * stride_indices_seq + i_t).to(tl.int64) * stride_init_state_token
             if STATE_V_FIRST:
                 p_h0 = p_h0 + i_hv * K * V + o_v[:, None] * K + o_k[None, :]
             else:
@@ -147,15 +214,15 @@ def fused_recurrent_kda_fwd_kernel(
         b_h += tl.load(p_h0, mask=mask_h, other=0).to(tl.float32)
 
     for i_t in tl.range(0, T, num_stages=num_stages):
-        b_q = tl.load(p_q, mask=mask_k, other=0, eviction_policy='evict_last').to(tl.float32)
-        b_k = tl.load(p_k, mask=mask_k, other=0, eviction_policy='evict_last').to(tl.float32)
-        b_v = tl.load(p_v, mask=mask_v, other=0, eviction_policy='evict_first').to(tl.float32)
+        b_q = tl.load(p_q, mask=mask_k, other=0, eviction_policy="evict_last").to(tl.float32)
+        b_k = tl.load(p_k, mask=mask_k, other=0, eviction_policy="evict_last").to(tl.float32)
+        b_v = tl.load(p_v, mask=mask_v, other=0, eviction_policy="evict_first").to(tl.float32)
 
         if USE_QK_L2NORM_IN_KERNEL:
             b_q = b_q / tl.sqrt(tl.sum(b_q * b_q) + 1e-6)
             b_k = b_k / tl.sqrt(tl.sum(b_k * b_k) + 1e-6)
         b_q = b_q * scale
-        b_g = tl.load(p_g, eviction_policy='evict_last').to(tl.float32)
+        b_g = tl.load(p_g, eviction_policy="evict_last").to(tl.float32)
 
         if USE_GATE_IN_KERNEL:
             b_A = tl.load(A_log + i_hv).to(tl.float32)
@@ -181,9 +248,9 @@ def fused_recurrent_kda_fwd_kernel(
         else:
             b_v -= tl.sum(b_h * b_k[:, None], 0)
         if IS_BETA_HEADWISE:
-            b_beta = tl.load(p_beta, mask=mask_v, other=0, eviction_policy='evict_first').to(tl.float32)
+            b_beta = tl.load(p_beta, mask=mask_v, other=0, eviction_policy="evict_first").to(tl.float32)
         else:
-            b_beta = tl.load(p_beta, eviction_policy='evict_last').to(tl.float32)
+            b_beta = tl.load(p_beta, eviction_policy="evict_last").to(tl.float32)
         if APPLY_BETA_SIGMOID:
             b_beta = tl.sigmoid(b_beta)
             if ALLOW_NEG_EIGVAL:
@@ -195,17 +262,11 @@ def fused_recurrent_kda_fwd_kernel(
         else:
             b_h += b_k[:, None] * b_v[None, :]
             b_o = tl.sum(b_h * b_q[:, None], 0)
-        tl.store(p_o, b_o.to(p_o.dtype.element_ty), mask=mask_v, eviction_policy='evict_first')
+        tl.store(p_o, b_o.to(p_o.dtype.element_ty), mask=mask_v, eviction_policy="evict_first")
 
         if IS_CONTINUOUS_BATCHING:
             if INPLACE_FINAL_STATE:
-                p_ht = (
-                    ht
-                    + tl.load(ssm_state_indices + i_n * stride_indices_seq + i_t).to(
-                        tl.int64
-                    )
-                    * stride_final_state_token
-                )
+                p_ht = ht + tl.load(ssm_state_indices + i_n * stride_indices_seq + i_t).to(tl.int64) * stride_final_state_token
             else:
                 p_ht = ht + (bos + i_t) * stride_final_state_token
             if STATE_V_FIRST:
@@ -289,7 +350,7 @@ def fused_recurrent_kda_fwd(
     else:
         stride_indices_seq, stride_indices_tok = ssm_state_indices.stride()
 
-    grid = (triton.cdiv(V, BV) * N * HV, )
+    grid = (triton.cdiv(V, BV) * N * HV,)
     fused_recurrent_kda_fwd_kernel[grid](
         q=q,
         k=k,
@@ -438,7 +499,7 @@ def fused_recurrent_kda(
             cu_seqlens=cu_seqlens
         )
     """
-    if 'transpose_state_layout' in kwargs:
+    if "transpose_state_layout" in kwargs:
         if state_v_first:
             raise ValueError("Cannot pass both `state_v_first` and the deprecated `transpose_state_layout`.")
         warnings.warn(
@@ -446,7 +507,7 @@ def fused_recurrent_kda(
             DeprecationWarning,
             stacklevel=2,
         )
-        state_v_first = kwargs.pop('transpose_state_layout')
+        state_v_first = kwargs.pop("transpose_state_layout")
 
     if cu_seqlens is not None:
         if q.shape[0] != 1:
@@ -463,6 +524,25 @@ def fused_recurrent_kda(
         scale = k.shape[-1] ** -0.5
     if allow_neg_eigval and not use_beta_sigmoid_in_kernel:
         raise ValueError("`allow_neg_eigval=True` requires `use_beta_sigmoid_in_kernel=True`.")
+
+    if _can_use_cute_kda(
+        q=q,
+        k=k,
+        v=v,
+        g=g,
+        beta=beta,
+        initial_state=initial_state,
+        use_qk_l2norm_in_kernel=use_qk_l2norm_in_kernel,
+        use_gate_in_kernel=use_gate_in_kernel,
+        use_beta_sigmoid_in_kernel=use_beta_sigmoid_in_kernel,
+        allow_neg_eigval=allow_neg_eigval,
+        lower_bound=lower_bound,
+        state_v_first=state_v_first,
+        cu_seqlens=cu_seqlens,
+    ):
+        from fla.ops.backends.cute.kda import kda_fwd_cute
+
+        return kda_fwd_cute(q, k, v, g, beta, initial_state, output_final_state, scale)
 
     o, final_state = fused_recurrent_kda_fwd(
         q=q,

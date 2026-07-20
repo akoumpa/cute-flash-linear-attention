@@ -13,13 +13,15 @@ from fla.ops.utils.op import exp
 from fla.utils import input_guard
 
 
-@triton.heuristics({
-    'USE_GV': lambda args: args['gv'] is not None,
-    'USE_INITIAL_STATE': lambda args: args['h0'] is not None,
-    'STORE_FINAL_STATE': lambda args: args['ht'] is not None,
-    'IS_VARLEN': lambda args: args['cu_seqlens'] is not None
-})
-@triton.jit(do_not_specialize=['T'])
+@triton.heuristics(
+    {
+        "USE_GV": lambda args: args["gv"] is not None,
+        "USE_INITIAL_STATE": lambda args: args["h0"] is not None,
+        "STORE_FINAL_STATE": lambda args: args["ht"] is not None,
+        "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
+    }
+)
+@triton.jit(do_not_specialize=["T"])
 def fused_recurrent_oja_fwd_kernel(
     q,
     k,
@@ -76,7 +78,7 @@ def fused_recurrent_oja_fwd_kernel(
 
     b_h = tl.zeros([BK, BV], dtype=tl.float32)
     if USE_INITIAL_STATE:
-        p_h0 = h0 + i_nh * K*V + o_k[:, None] * V + o_v[None, :]
+        p_h0 = h0 + i_nh * K * V + o_k[:, None] * V + o_v[None, :]
         b_h += tl.load(p_h0, mask=mask_h, other=0).to(tl.float32)
 
     for _ in range(0, T):
@@ -105,16 +107,16 @@ def fused_recurrent_oja_fwd_kernel(
         b_o = tl.sum(b_h * b_q[:, None], 0)
         tl.store(p_o, b_o.to(p_o.dtype.element_ty), mask=mask_v)
 
-        p_q += H*K
-        p_k += H*K
-        p_v += HV*V
+        p_q += H * K
+        p_k += H * K
+        p_v += HV * V
         if USE_GV:
-            p_gv += HV*V
+            p_gv += HV * V
         p_beta += HV * (1 if IS_BETA_HEADWISE else V)
-        p_o += HV*V
+        p_o += HV * V
 
     if STORE_FINAL_STATE:
-        p_ht = ht + i_nh * K*V + o_k[:, None] * V + o_v[None, :]
+        p_ht = ht + i_nh * K * V + o_k[:, None] * V + o_v[None, :]
         tl.store(p_ht, b_h.to(p_ht.dtype.element_ty), mask=mask_h)
 
 
@@ -134,6 +136,69 @@ def fused_recurrent_oja_fwd(
     B, T, H, K, V = *k.shape, v.shape[-1]
     assert V <= 128
     HV = v.shape[2]
+    can_use_cute = (
+        not torch.compiler.is_compiling()
+        and cu_seqlens is None
+        and not use_q_l2norm
+        and not use_k_l2norm
+        and B >= 1
+        and T >= 1
+        and T <= 16
+        and H >= 1
+        and HV == H
+        and K == 32
+        and V == 32
+        and B * HV == 4
+        and scale is not None
+        and q.is_cuda
+        and q.dtype in (torch.float16, torch.bfloat16)
+        and q.dtype == k.dtype == v.dtype
+        and q.shape == k.shape
+        and v.shape == (B, T, HV, V)
+        and q.device == k.device == v.device == beta.device
+        and q.is_contiguous()
+        and k.is_contiguous()
+        and v.is_contiguous()
+        and beta.ndim == 3
+        and beta.shape == (B, T, HV)
+        and beta.dtype in (torch.float16, torch.bfloat16, torch.float32)
+        and beta.is_contiguous()
+        and B * HV * K * V <= 2**31 - 1
+        and (
+            gv is None
+            or (
+                gv.shape == v.shape
+                and gv.device == q.device
+                and gv.dtype in (torch.float16, torch.bfloat16, torch.float32)
+                and gv.is_contiguous()
+            )
+        )
+    )
+    if initial_state is not None and (
+        initial_state.shape != (B, HV, K, V)
+        or initial_state.dtype != torch.float32
+        or initial_state.device != q.device
+        or not initial_state.is_contiguous()
+    ):
+        can_use_cute = False
+    if can_use_cute:
+        from fla.ops.backends.cute.runtime import is_cute_dsl_available
+
+        can_use_cute = is_cute_dsl_available()
+    if can_use_cute:
+        from fla.ops.backends.cute.oja import oja_fwd_cute
+
+        return oja_fwd_cute(
+            q=q,
+            k=k,
+            v=v,
+            gv=gv,
+            beta=beta,
+            scale=scale,
+            initial_state=initial_state,
+            output_final_state=output_final_state,
+        )
+
     N = B if cu_seqlens is None else len(cu_seqlens) - 1
     BK, BV = triton.next_power_of_2(K), min(triton.next_power_of_2(V), 256)
     NV = triton.cdiv(V, BV)
@@ -173,7 +238,6 @@ def fused_recurrent_oja_fwd(
 
 
 class FusedRecurrentFunction(torch.autograd.Function):
-
     @staticmethod
     @input_guard
     def forward(
@@ -230,8 +294,7 @@ def fused_recurrent_gated_oja_rule(
     cu_seqlens: torch.LongTensor | None = None,
     **kwargs,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-
-    if 'use_qk_l2norm_in_kernel' in kwargs and (not use_q_l2norm and not use_k_l2norm):
+    if "use_qk_l2norm_in_kernel" in kwargs and (not use_q_l2norm and not use_k_l2norm):
         use_q_l2norm = True
         use_k_l2norm = True
 

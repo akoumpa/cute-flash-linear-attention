@@ -30,6 +30,84 @@ from fla.ops.utils.index import prepare_chunk_indices
 from fla.utils import autocast_custom_bwd, autocast_custom_fwd, input_guard
 
 
+def _can_use_cute_gated_delta_rule(
+    q,
+    k,
+    v,
+    g,
+    beta,
+    initial_state,
+    output_final_state,
+    use_qk_l2norm_in_kernel,
+    use_gate_in_kernel,
+    use_beta_sigmoid_in_kernel,
+    allow_neg_eigval,
+    state_v_first,
+    cu_seqlens,
+    cp_context,
+):
+    if (
+        torch.is_grad_enabled()
+        or use_qk_l2norm_in_kernel
+        or use_gate_in_kernel
+        or use_beta_sigmoid_in_kernel
+        or allow_neg_eigval
+        or state_v_first
+        or cu_seqlens is not None
+        or cp_context is not None
+        or not q.is_cuda
+        or q.dtype not in (torch.float16, torch.bfloat16)
+        or q.dtype != k.dtype
+        or q.dtype != v.dtype
+        or q.ndim != 4
+        or v.ndim != 4
+        or k.shape != q.shape
+    ):
+        return False
+    B, T, H, K = q.shape
+    HV, V = v.shape[2:]
+    if (
+        B < 1
+        or not 1 <= T <= 8
+        or H < 1
+        or HV < H
+        or HV % H != 0
+        or B * HV < 4
+        or (T > 1 and (initial_state is not None or output_final_state))
+        or (q.dtype == torch.bfloat16 and (initial_state is not None or output_final_state))
+        or (q.dtype == torch.bfloat16 and T > 1)
+        or K != 32
+        or V != 32
+        or v.shape != (B, T, HV, V)
+        or g.shape != (B, T, HV)
+        or beta.shape != g.shape
+        or g.dtype not in (torch.float16, torch.bfloat16, torch.float32)
+        or beta.dtype not in (torch.float16, torch.bfloat16, torch.float32)
+        or q.device != k.device
+        or q.device != v.device
+        or q.device != g.device
+        or q.device != beta.device
+        or not q.is_contiguous()
+        or not k.is_contiguous()
+        or not v.is_contiguous()
+        or not g.is_contiguous()
+        or not beta.is_contiguous()
+    ):
+        return False
+    if initial_state is not None and (
+        initial_state.shape != (B, HV, K, V)
+        or initial_state.dtype != torch.float32
+        or initial_state.device != q.device
+        or not initial_state.is_contiguous()
+    ):
+        return False
+    if output_final_state and B * HV * K * V > 2**31 - 1:
+        return False
+    from fla.ops.backends.cute.runtime import is_cute_dsl_available
+
+    return is_cute_dsl_available()
+
+
 def chunk_gated_delta_rule_fwd(
     q: torch.Tensor,
     k: torch.Tensor,
@@ -251,7 +329,6 @@ def chunk_gated_delta_rule_bwd(
 
 
 class ChunkGatedDeltaRuleFunction(torch.autograd.Function):
-
     @staticmethod
     @input_guard
     @autocast_custom_fwd
@@ -386,13 +463,29 @@ class ChunkGatedDeltaRuleFunction(torch.autograd.Function):
         if ctx.use_beta_sigmoid_in_kernel:
             db = fused_beta_sigmoid_bwd(beta_raw, db, scale=2.0 if ctx.allow_neg_eigval else 1.0)
         return (
-            dq.to(q), dk.to(k), dv.to(v), dg.to(g), db.to(beta_raw),
-            None, dh0, None, None, None, None, None, None, dA_log, ddt_bias,
-            None, None, None, None,
+            dq.to(q),
+            dk.to(k),
+            dv.to(v),
+            dg.to(g),
+            db.to(beta_raw),
+            None,
+            dh0,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            dA_log,
+            ddt_bias,
+            None,
+            None,
+            None,
+            None,
         )
 
 
-@dispatch('gated_delta_rule')
+@dispatch("gated_delta_rule")
 @torch.compiler.disable
 def chunk_gated_delta_rule(
     q: torch.Tensor,
@@ -503,7 +596,7 @@ def chunk_gated_delta_rule(
             cu_seqlens=cu_seqlens
         )
     """
-    if 'transpose_state_layout' in kwargs:
+    if "transpose_state_layout" in kwargs:
         if state_v_first:
             raise ValueError("Cannot pass both `state_v_first` and the deprecated `transpose_state_layout`.")
         warnings.warn(
@@ -511,27 +604,25 @@ def chunk_gated_delta_rule(
             DeprecationWarning,
             stacklevel=2,
         )
-        state_v_first = kwargs.pop('transpose_state_layout')
+        state_v_first = kwargs.pop("transpose_state_layout")
 
     # Validate head dimensions
     if q.shape[2] != k.shape[2]:
         raise ValueError(
-            f"q and k must have the same number of heads, "
-            f"but got q.shape[2]={q.shape[2]} and k.shape[2]={k.shape[2]}"
+            f"q and k must have the same number of heads, but got q.shape[2]={q.shape[2]} and k.shape[2]={k.shape[2]}"
         )
     H, HV = q.shape[2], v.shape[2]
     if HV % H != 0:
         raise ValueError(
-            f"For GVA, num_v_heads (HV={HV}) must be evenly divisible by "
-            f"num_heads (H={H}), but got HV % H = {HV % H}"
+            f"For GVA, num_v_heads (HV={HV}) must be evenly divisible by num_heads (H={H}), but got HV % H = {HV % H}"
         )
 
-    if 'head_first' in kwargs:
+    if "head_first" in kwargs:
         raise DeprecationWarning(
             "head_first has been removed. Inputs must be in `[B, T, H, ...]` format.",
         )
 
-    chunk_size = kwargs.pop('chunk_size', 64)
+    chunk_size = kwargs.pop("chunk_size", 64)
     if chunk_size not in (16, 32, 64):
         raise ValueError(f"`chunk_size` must be 16, 32, or 64 for Gated Delta Rule, got {chunk_size}.")
 
@@ -554,9 +645,9 @@ def chunk_gated_delta_rule(
                 f"The number of initial states is expected to be equal to the number of input sequences, "
                 f"i.e., {len(cu_seqlens) - 1} rather than {initial_state.shape[0]}.",
             )
-    use_gate_in_kernel = kwargs.get('use_gate_in_kernel', False)
-    A_log = kwargs.get('A_log')
-    dt_bias = kwargs.get('dt_bias')
+    use_gate_in_kernel = kwargs.get("use_gate_in_kernel", False)
+    A_log = kwargs.get("A_log")
+    dt_bias = kwargs.get("dt_bias")
     if use_gate_in_kernel:
         assert A_log is not None, "A_log must be provided when use_gate_in_kernel=True."
     if allow_neg_eigval and not use_beta_sigmoid_in_kernel:
@@ -564,6 +655,25 @@ def chunk_gated_delta_rule(
 
     if scale is None:
         scale = k.shape[-1] ** -0.5
+    if _can_use_cute_gated_delta_rule(
+        q=q,
+        k=k,
+        v=v,
+        g=g,
+        beta=beta,
+        initial_state=initial_state,
+        output_final_state=output_final_state,
+        use_qk_l2norm_in_kernel=use_qk_l2norm_in_kernel,
+        use_gate_in_kernel=use_gate_in_kernel,
+        use_beta_sigmoid_in_kernel=use_beta_sigmoid_in_kernel,
+        allow_neg_eigval=allow_neg_eigval,
+        state_v_first=state_v_first,
+        cu_seqlens=cu_seqlens,
+        cp_context=cp_context,
+    ):
+        from fla.ops.backends.cute.gated_delta_rule import gated_delta_rule_fwd_cute
+
+        return gated_delta_rule_fwd_cute(q, k, v, g, beta, initial_state, output_final_state, scale)
     o, final_state = ChunkGatedDeltaRuleFunction.apply(
         q,
         k,

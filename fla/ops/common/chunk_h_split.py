@@ -13,23 +13,85 @@ from fla.ops.utils.op import exp
 from fla.utils import autotune_cache_kwargs
 
 
-@triton.heuristics({
-    'USE_INITIAL_STATE': lambda args: args['h0'] is not None,
-    'STORE_FINAL_STATE': lambda args: args['ht'] is not None,
-    'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
-})
+def _can_use_cute_chunk_h_split(
+    k: torch.Tensor,
+    v: torch.Tensor,
+    g: torch.Tensor | None,
+    gk: torch.Tensor | None,
+    gv: torch.Tensor | None,
+    h0: torch.Tensor | None,
+    cu_seqlens: torch.Tensor | None,
+    split_offsets: torch.Tensor | None,
+    split_indices: torch.Tensor | None,
+    split_size: int,
+    output_final_state: bool,
+) -> bool:
+    if (
+        torch.compiler.is_compiling()
+        or cu_seqlens is not None
+        or split_offsets is not None
+        or split_indices is not None
+        or g is not None
+        or gk is not None
+        or gv is not None
+        or not k.is_cuda
+        or k.dtype not in (torch.float16, torch.bfloat16, torch.float32)
+        or k.dtype != v.dtype
+        or k.device != v.device
+        or k.ndim != 4
+        or v.ndim != 4
+        or k.shape[:3] != v.shape[:3]
+        or not k.is_contiguous()
+        or not v.is_contiguous()
+    ):
+        return False
+    B, T, H, K = k.shape
+    V = v.shape[-1]
+    if output_final_state and T * K * V > 8192:
+        return False
+    if (
+        B < 1
+        or T < 1
+        or H < 1
+        or K < 1
+        or V < 1
+        or split_size < T
+        or T > 16
+        or K > 64
+        or V > 64
+        or k.numel() > 2**31 - 1
+        or B * H * K * V > 2**31 - 1
+    ):
+        return False
+    if h0 is not None and (
+        h0.shape != (B, H, K, V) or h0.dtype != torch.float32 or h0.device != k.device or not h0.is_contiguous()
+    ):
+        return False
+
+    from fla.ops.backends.cute.runtime import is_cute_dsl_available
+
+    return is_cute_dsl_available()
+
+
+@triton.heuristics(
+    {
+        "USE_INITIAL_STATE": lambda args: args["h0"] is not None,
+        "STORE_FINAL_STATE": lambda args: args["ht"] is not None,
+        "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
+    }
+)
 @triton.autotune(
     configs=[
-        triton.Config({'BK': BK, 'BV': BV}, num_warps=num_warps, num_stages=num_stages)
+        triton.Config({"BK": BK, "BV": BV}, num_warps=num_warps, num_stages=num_stages)
         for BK in [32, 64]
         for BV in [32, 64]
         for num_warps in [2, 4, 8]
         for num_stages in [2, 3]
     ],
-    key=['BT', 'USE_G', 'USE_GK', 'USE_GV'],
+    key=["BT", "USE_G", "USE_GK", "USE_GV"],
     **autotune_cache_kwargs,
 )
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=["T"])
 def chunk_fwd_kernel_h_split(
     k,
     v,
@@ -79,13 +141,13 @@ def chunk_fwd_kernel_h_split(
     # for the first split, we directly store the state as the final result
     if i_s == 0:
         if USE_INITIAL_STATE:
-            p_h0 = tl.make_block_ptr(h0 + i_nh * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+            p_h0 = tl.make_block_ptr(h0 + i_nh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
             b_h += tl.load(p_h0, boundary_check=(0, 1)).to(tl.float32)
-        p_hr = tl.make_block_ptr(hr + i_sh * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        p_hr = tl.make_block_ptr(hr + i_sh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
         tl.store(p_hr, b_h.to(p_hr.dtype.element_ty), boundary_check=(0, 1))
     for i_t in range(tl.cdiv(i_s * S, BT), tl.cdiv(min(i_s * S + S, T), BT)):
-        p_k = tl.make_block_ptr(k + (bos*H + i_h) * K, (K, T), (1, H*K), (i_k * BK, i_t * BT), (BK, BT), (0, 1))
-        p_v = tl.make_block_ptr(v + (bos*H + i_h) * V, (T, V), (H*V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+        p_k = tl.make_block_ptr(k + (bos * H + i_h) * K, (K, T), (1, H * K), (i_k * BK, i_t * BT), (BK, BT), (0, 1))
+        p_v = tl.make_block_ptr(v + (bos * H + i_h) * V, (T, V), (H * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
         # [BK, BT]
         b_k = tl.load(p_k, boundary_check=(0, 1))
         # [BT, BV]
@@ -95,17 +157,17 @@ def chunk_fwd_kernel_h_split(
         # scalar decay
         if USE_G:
             b_g_last = tl.load(g + bos * H + last_idx * H + i_h)
-            p_g = g + bos*H + (i_t * BT + tl.arange(0, BT)) * H + i_h
+            p_g = g + bos * H + (i_t * BT + tl.arange(0, BT)) * H + i_h
             b_h *= exp(b_g_last)
-            b_g = tl.load(p_g, mask=(i_t * BT + tl.arange(0, BT) < T), other=0.)
+            b_g = tl.load(p_g, mask=(i_t * BT + tl.arange(0, BT) < T), other=0.0)
             b_v = (b_v * exp(b_g_last - b_g)[:, None]).to(b_v.dtype)
 
         # vector decay, h = Diag(gk) @ h
         if USE_GK:
-            p_gk = tl.make_block_ptr(gk + (bos*H + i_h) * K, (K, T), (1, H*K), (i_k * BK, i_t * BT), (BK, BT), (0, 1))
-            p_gk_last = gk + (bos + last_idx) * H*K + i_h * K + i_k * BK + tl.arange(0, BK)
+            p_gk = tl.make_block_ptr(gk + (bos * H + i_h) * K, (K, T), (1, H * K), (i_k * BK, i_t * BT), (BK, BT), (0, 1))
+            p_gk_last = gk + (bos + last_idx) * H * K + i_h * K + i_k * BK + tl.arange(0, BK)
 
-            b_gk_last = tl.load(p_gk_last, mask=(i_k * BK + tl.arange(0, BK) < K), other=0.)
+            b_gk_last = tl.load(p_gk_last, mask=(i_k * BK + tl.arange(0, BK) < K), other=0.0)
             b_h *= exp(b_gk_last)[:, None]
 
             b_gk = tl.load(p_gk, boundary_check=(0, 1))
@@ -113,10 +175,10 @@ def chunk_fwd_kernel_h_split(
 
         # vector decay, h = h @ Diag(gv)
         if USE_GV:
-            p_gv = tl.make_block_ptr(gv + (bos*H + i_h) * V, (T, V), (H*V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
-            p_gv_last = gv + (bos + last_idx) * H*V + i_h * V + i_v * BV + tl.arange(0, BV)
+            p_gv = tl.make_block_ptr(gv + (bos * H + i_h) * V, (T, V), (H * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+            p_gv_last = gv + (bos + last_idx) * H * V + i_h * V + i_v * BV + tl.arange(0, BV)
 
-            b_gv_last = tl.load(p_gv_last, mask=(i_v * BV + tl.arange(0, BV) < V), other=0.)
+            b_gv_last = tl.load(p_gv_last, mask=(i_v * BV + tl.arange(0, BV) < V), other=0.0)
             b_h *= exp(b_gv_last)[None, :]
 
             b_gv = tl.load(p_gv, boundary_check=(0, 1))
@@ -127,29 +189,31 @@ def chunk_fwd_kernel_h_split(
     # if there are more than one splits, we store the result to (unreduced) hs
     # otherwise, we store the result to ht as the final state
     if NS > 1:
-        p_hs = tl.make_block_ptr(hs + i_sh * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        p_hs = tl.make_block_ptr(hs + i_sh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
         tl.store(p_hs, b_h.to(p_hs.dtype.element_ty), boundary_check=(0, 1))
     elif STORE_FINAL_STATE:
-        p_ht = tl.make_block_ptr(ht + i_nh * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        p_ht = tl.make_block_ptr(ht + i_nh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
         tl.store(p_ht, b_h.to(p_ht.dtype.element_ty), boundary_check=(0, 1))
 
 
-@triton.heuristics({
-    'STORE_FINAL_STATE': lambda args: args['ht'] is not None,
-    'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
-})
+@triton.heuristics(
+    {
+        "STORE_FINAL_STATE": lambda args: args["ht"] is not None,
+        "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
+    }
+)
 @triton.autotune(
     configs=[
-        triton.Config({'BK': BK, 'BV': BV}, num_warps=num_warps, num_stages=num_stages)
+        triton.Config({"BK": BK, "BV": BV}, num_warps=num_warps, num_stages=num_stages)
         for BK in [32, 64]
         for BV in [32, 64]
         for num_warps in [2, 4, 8]
         for num_stages in [2, 3, 4]
     ],
-    key=['BT', 'USE_G', 'USE_GK', 'USE_GV'],
+    key=["BT", "USE_G", "USE_GK", "USE_GV"],
     **autotune_cache_kwargs,
 )
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=["T"])
 def chunk_fwd_kernel_h_reduction(
     g,
     gk,
@@ -188,8 +252,10 @@ def chunk_fwd_kernel_h_reduction(
     b_h = tl.zeros([BK, BV], dtype=tl.float32)
     # skip the first split
     for i_s in range(1, NS):
-        p_hs = tl.make_block_ptr(hs + ((boh + i_s-1) * H + i_h) * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
-        p_hr = tl.make_block_ptr(hr + ((boh + i_s) * H + i_h) * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        p_hs = tl.make_block_ptr(
+            hs + ((boh + i_s - 1) * H + i_h) * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0)
+        )
+        p_hr = tl.make_block_ptr(hr + ((boh + i_s) * H + i_h) * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
         b_h += tl.load(p_hs, boundary_check=(0, 1)).to(tl.float32)
         tl.store(p_hr, b_h.to(p_hr.dtype.element_ty), boundary_check=(0, 1))
 
@@ -202,41 +268,45 @@ def chunk_fwd_kernel_h_reduction(
 
             # vector decay, h = Diag(gk) @ h
             if USE_GK:
-                p_gk_last = gk + (bos + last_idx) * H*K + i_h * K + i_k * BK + tl.arange(0, BK)
-                b_gk_last = tl.load(p_gk_last, mask=(i_k * BK + tl.arange(0, BK) < K), other=0.)
+                p_gk_last = gk + (bos + last_idx) * H * K + i_h * K + i_k * BK + tl.arange(0, BK)
+                b_gk_last = tl.load(p_gk_last, mask=(i_k * BK + tl.arange(0, BK) < K), other=0.0)
                 b_h *= exp(b_gk_last)[:, None]
 
             # vector decay, h = h @ Diag(gv)
             if USE_GV:
-                p_gv_last = gv + (bos + last_idx) * H*V + i_h * V + i_v * BV + tl.arange(0, BV)
-                b_gv_last = tl.load(p_gv_last, mask=(i_v * BV + tl.arange(0, BV) < V), other=0.)
+                p_gv_last = gv + (bos + last_idx) * H * V + i_h * V + i_v * BV + tl.arange(0, BV)
+                b_gv_last = tl.load(p_gv_last, mask=(i_v * BV + tl.arange(0, BV) < V), other=0.0)
                 b_h *= exp(b_gv_last)[None, :]
 
     if NS > 1:
         if STORE_FINAL_STATE:
-            p_hs = tl.make_block_ptr(hs + ((boh + NS-1) * H + i_h)*K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
-            p_ht = tl.make_block_ptr(ht + i_nh * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+            p_hs = tl.make_block_ptr(
+                hs + ((boh + NS - 1) * H + i_h) * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0)
+            )
+            p_ht = tl.make_block_ptr(ht + i_nh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
             b_h += tl.load(p_hs, boundary_check=(0, 1)).to(tl.float32)
             tl.store(p_ht, b_h.to(p_ht.dtype.element_ty), boundary_check=(0, 1))
 
 
-@triton.heuristics({
-    'USE_FINAL_STATE_GRADIENT': lambda args: args['dht'] is not None,
-    'STORE_INITIAL_STATE_GRADIENT': lambda args: args['dh0'] is not None,
-    'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
-})
+@triton.heuristics(
+    {
+        "USE_FINAL_STATE_GRADIENT": lambda args: args["dht"] is not None,
+        "STORE_INITIAL_STATE_GRADIENT": lambda args: args["dh0"] is not None,
+        "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
+    }
+)
 @triton.autotune(
     configs=[
-        triton.Config({'BK': BK, 'BV': BV}, num_warps=num_warps, num_stages=num_stages)
+        triton.Config({"BK": BK, "BV": BV}, num_warps=num_warps, num_stages=num_stages)
         for BK in [32, 64]
         for BV in [32, 64]
         for num_warps in [2, 4, 8]
         for num_stages in [2, 3]
     ],
-    key=['BT', 'USE_G', 'USE_GK', 'USE_GV'],
+    key=["BT", "USE_G", "USE_GK", "USE_GV"],
     **autotune_cache_kwargs,
 )
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=["T"])
 def chunk_bwd_kernel_dh_split(
     q,
     g,
@@ -289,14 +359,14 @@ def chunk_bwd_kernel_dh_split(
     b_dh = tl.zeros([BK, BV], dtype=tl.float32)
     if i_s == NS - 1:
         if USE_FINAL_STATE_GRADIENT:
-            p_dht = tl.make_block_ptr(dht + i_nh * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+            p_dht = tl.make_block_ptr(dht + i_nh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
             b_dh += tl.load(p_dht, boundary_check=(0, 1)).to(tl.float32)
-        p_dhr = tl.make_block_ptr(dhr + i_sh * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        p_dhr = tl.make_block_ptr(dhr + i_sh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
         tl.store(p_dhr, b_dh.to(p_dhr.dtype.element_ty), boundary_check=(0, 1))
 
     for i_t in range(tl.cdiv(min(i_s * S + S, T), BT) - 1, tl.cdiv(i_s * S, BT) - 1, -1):
-        p_q = tl.make_block_ptr(q + (bos*HQ + i_hq) * K, (K, T), (1, HQ*K), (i_k * BK, i_t * BT), (BK, BT), (0, 1))
-        p_do = tl.make_block_ptr(do + (bos*HQ + i_hq) * V, (T, V), (HQ*V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+        p_q = tl.make_block_ptr(q + (bos * HQ + i_hq) * K, (K, T), (1, HQ * K), (i_k * BK, i_t * BT), (BK, BT), (0, 1))
+        p_do = tl.make_block_ptr(do + (bos * HQ + i_hq) * V, (T, V), (HQ * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
 
         b_q = tl.load(p_q, boundary_check=(0, 1))
         b_q = (b_q * scale).to(b_q.dtype)
@@ -307,55 +377,57 @@ def chunk_bwd_kernel_dh_split(
         if USE_G:
             p_g = g + (bos + i_t * BT + tl.arange(0, BT)) * H + i_h
             b_g_last = tl.load(g + (bos + last_idx) * H + i_h)
-            b_g = tl.load(p_g, mask=(i_t * BT + tl.arange(0, BT) < T), other=0.)
+            b_g = tl.load(p_g, mask=(i_t * BT + tl.arange(0, BT) < T), other=0.0)
             b_q = (b_q * exp(b_g)[None, :]).to(b_q.dtype)
             b_dh *= exp(b_g_last)
 
         if USE_GK:
-            p_gk = tl.make_block_ptr(gk + (bos*H + i_h) * K, (K, T), (1, H*K), (i_k * BK, i_t * BT), (BK, BT), (0, 1))
-            p_gk_last = gk + (bos + last_idx) * H*K + i_h * K + i_k * BK + tl.arange(0, BK)
+            p_gk = tl.make_block_ptr(gk + (bos * H + i_h) * K, (K, T), (1, H * K), (i_k * BK, i_t * BT), (BK, BT), (0, 1))
+            p_gk_last = gk + (bos + last_idx) * H * K + i_h * K + i_k * BK + tl.arange(0, BK)
 
             b_gk = tl.load(p_gk, boundary_check=(0, 1))
             b_q = (b_q * exp(b_gk)).to(b_q.dtype)
-            b_gk_last = tl.load(p_gk_last, mask=(i_k * BK + tl.arange(0, BK) < K), other=0.)
+            b_gk_last = tl.load(p_gk_last, mask=(i_k * BK + tl.arange(0, BK) < K), other=0.0)
             b_dh *= exp(b_gk_last)[:, None]
 
         if USE_GV:
-            p_gv = tl.make_block_ptr(gv + (bos*H + i_h) * V, (T, V), (H*V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
-            p_gv_last = gv + (bos + last_idx) * H*V + i_h * V + i_v * BV + tl.arange(0, BV)
+            p_gv = tl.make_block_ptr(gv + (bos * H + i_h) * V, (T, V), (H * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+            p_gv_last = gv + (bos + last_idx) * H * V + i_h * V + i_v * BV + tl.arange(0, BV)
 
             b_gv = tl.load(p_gv, boundary_check=(0, 1))
             b_do = (b_do * exp(b_gv)).to(b_do.dtype)
 
-            b_gv_last = tl.load(p_gv_last, mask=(i_v * BV + tl.arange(0, BV) < V), other=0.)
+            b_gv_last = tl.load(p_gv_last, mask=(i_v * BV + tl.arange(0, BV) < V), other=0.0)
             b_dh *= exp(b_gv_last)[None, :]
 
         b_dh += tl.dot(b_q, b_do)
 
     if NS > 1:
-        p_dhs = tl.make_block_ptr(dhs + i_sh * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        p_dhs = tl.make_block_ptr(dhs + i_sh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
         tl.store(p_dhs, b_dh.to(p_dhs.dtype.element_ty), boundary_check=(0, 1))
     elif STORE_INITIAL_STATE_GRADIENT:
-        p_dh0 = tl.make_block_ptr(dh0 + i_nh * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        p_dh0 = tl.make_block_ptr(dh0 + i_nh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
         tl.store(p_dh0, b_dh.to(p_dh0.dtype.element_ty), boundary_check=(0, 1))
 
 
-@triton.heuristics({
-    'STORE_INITIAL_STATE_GRADIENT': lambda args: args['dh0'] is not None,
-    'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
-})
+@triton.heuristics(
+    {
+        "STORE_INITIAL_STATE_GRADIENT": lambda args: args["dh0"] is not None,
+        "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
+    }
+)
 @triton.autotune(
     configs=[
-        triton.Config({'BK': BK, 'BV': BV}, num_warps=num_warps, num_stages=num_stages)
+        triton.Config({"BK": BK, "BV": BV}, num_warps=num_warps, num_stages=num_stages)
         for BK in [32, 64]
         for BV in [32, 64]
         for num_warps in [2, 4, 8]
         for num_stages in [2, 3, 4]
     ],
-    key=['BT', 'USE_G', 'USE_GK', 'USE_GV'],
+    key=["BT", "USE_G", "USE_GK", "USE_GV"],
     **autotune_cache_kwargs,
 )
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=["T"])
 def chunk_bwd_kernel_dh_reduction(
     g,
     gk,
@@ -396,8 +468,12 @@ def chunk_bwd_kernel_dh_reduction(
 
     b_dh = tl.zeros([BK, BV], dtype=tl.float32)
     for i_s in range(NS - 2, -1, -1):
-        p_dhs = tl.make_block_ptr(dhs + ((boh+i_s+1) * H + i_h) * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
-        p_dhr = tl.make_block_ptr(dhr + ((boh+i_s) * H + i_h) * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        p_dhs = tl.make_block_ptr(
+            dhs + ((boh + i_s + 1) * H + i_h) * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0)
+        )
+        p_dhr = tl.make_block_ptr(
+            dhr + ((boh + i_s) * H + i_h) * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0)
+        )
         b_dh += tl.load(p_dhs, boundary_check=(0, 1)).to(tl.float32)
         tl.store(p_dhr, b_dh.to(p_dhr.dtype.element_ty), boundary_check=(0, 1))
 
@@ -409,19 +485,19 @@ def chunk_bwd_kernel_dh_reduction(
                 b_dh *= exp(b_g_last)
 
             if USE_GK:
-                p_gk_last = gk + (bos + last_idx) * H*K + i_h * K + i_k * BK + tl.arange(0, BK)
-                b_gk_last = tl.load(p_gk_last, mask=(i_k * BK + tl.arange(0, BK) < K), other=0.)
+                p_gk_last = gk + (bos + last_idx) * H * K + i_h * K + i_k * BK + tl.arange(0, BK)
+                b_gk_last = tl.load(p_gk_last, mask=(i_k * BK + tl.arange(0, BK) < K), other=0.0)
                 b_dh *= exp(b_gk_last)[:, None]
 
             if USE_GV:
-                p_gv_last = gv + (bos + last_idx) * H*V + i_h * V + i_v * BV + tl.arange(0, BV)
-                b_gv_last = tl.load(p_gv_last, mask=(i_v * BV + tl.arange(0, BV) < V), other=0.)
+                p_gv_last = gv + (bos + last_idx) * H * V + i_h * V + i_v * BV + tl.arange(0, BV)
+                b_gv_last = tl.load(p_gv_last, mask=(i_v * BV + tl.arange(0, BV) < V), other=0.0)
                 b_dh *= exp(b_gv_last)[None, :]
 
     if NS > 1:
         if STORE_INITIAL_STATE_GRADIENT:
-            p_dhs = tl.make_block_ptr(dhs + (boh * H + i_h)*K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
-            p_dh0 = tl.make_block_ptr(dh0 + i_nh * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+            p_dhs = tl.make_block_ptr(dhs + (boh * H + i_h) * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+            p_dh0 = tl.make_block_ptr(dh0 + i_nh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
             b_dh += tl.load(p_dhs, boundary_check=(0, 1)).to(tl.float32)
             tl.store(p_dh0, b_dh.to(p_dh0.dtype.element_ty), boundary_check=(0, 1))
 
@@ -450,6 +526,28 @@ def chunk_fwd_h(
     # BT: chunk size
     S, BT = split_size, chunk_size
     assert S % BT == 0, f"The `split_size` (got {S}) must be a multiple of `chunk_size` {BT}"
+    if _can_use_cute_chunk_h_split(
+        k,
+        v,
+        g,
+        gk,
+        gv,
+        h0,
+        cu_seqlens,
+        split_offsets,
+        split_indices,
+        split_size,
+        output_final_state,
+    ):
+        from fla.ops.backends.cute.chunk_h_split import chunk_h_split_fwd_cute
+
+        return chunk_h_split_fwd_cute(
+            k=k,
+            v=v,
+            h0=h0,
+            output_final_state=output_final_state,
+            states_in_fp32=states_in_fp32,
+        )
     if cu_seqlens is None:
         N = B
         NS = N * triton.cdiv(T, S)
@@ -462,8 +560,11 @@ def chunk_fwd_h(
     # reduced states per split
     hr = k.new_empty(NS, H, K, V, dtype=torch.float if states_in_fp32 else k.dtype)
     ht = k.new_empty(N, H, K, V, dtype=torch.float) if output_final_state else None
+
     # parallelized over splits
-    def grid(meta): return (triton.cdiv(K, meta['BK']), triton.cdiv(V, meta['BV']), NS * H)
+    def grid(meta):
+        return (triton.cdiv(K, meta["BK"]), triton.cdiv(V, meta["BV"]), NS * H)
+
     chunk_fwd_kernel_h_split[grid](
         k=k,
         v=v,
@@ -486,7 +587,10 @@ def chunk_fwd_h(
         USE_GK=gk is not None,
         USE_GV=gv is not None,
     )
-    def grid(meta): return (triton.cdiv(K, meta['BK']), triton.cdiv(V, meta['BV']), N * H)
+
+    def grid(meta):
+        return (triton.cdiv(K, meta["BK"]), triton.cdiv(V, meta["BV"]), N * H)
+
     chunk_fwd_kernel_h_reduction[grid](
         g=g,
         gk=gk,
@@ -551,7 +655,9 @@ def chunk_bwd_dh(
     dh0 = torch.empty_like(h0, dtype=torch.float) if h0 is not None else None
 
     # parallelized over splits
-    def grid(meta): return (triton.cdiv(K, meta['BK']), triton.cdiv(V, meta['BV']), NS * HQ)
+    def grid(meta):
+        return (triton.cdiv(K, meta["BK"]), triton.cdiv(V, meta["BV"]), NS * HQ)
+
     chunk_bwd_kernel_dh_split[grid](
         q=q,
         g=g,
@@ -578,7 +684,9 @@ def chunk_bwd_dh(
         USE_GV=gv is not None,
     )
 
-    def grid(meta): return (triton.cdiv(K, meta['BK']), triton.cdiv(V, meta['BV']), N * HQ)
+    def grid(meta):
+        return (triton.cdiv(K, meta["BK"]), triton.cdiv(V, meta["BV"]), N * HQ)
+
     chunk_bwd_kernel_dh_reduction[grid](
         g=g,
         gk=gk,

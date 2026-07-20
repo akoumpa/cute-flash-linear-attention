@@ -52,10 +52,33 @@ def fused_beta_sigmoid_bwd_kernel(
 
 _BETA_SIGMOID_BLOCK_SIZE = 2048
 _BETA_SIGMOID_NUM_WARPS = 8
+_CUTE_BETA_SIGMOID_MIN_ELEMENTS = 65536
+_CUTE_BETA_SIGMOID_MAX_ELEMENTS = 2**31 - 1
 
 
-@dispatch('common')
+def _can_use_cute_beta_sigmoid(x: torch.Tensor, dy: torch.Tensor | None = None) -> bool:
+    if not (_CUTE_BETA_SIGMOID_MIN_ELEMENTS <= x.numel() <= _CUTE_BETA_SIGMOID_MAX_ELEMENTS):
+        return False
+    if not x.is_cuda or not x.is_contiguous():
+        return False
+    if x.dtype not in (torch.float16, torch.bfloat16, torch.float32):
+        return False
+    if dy is not None:
+        if dy.shape != x.shape or dy.device != x.device or not dy.is_contiguous():
+            return False
+        if dy.dtype not in (torch.float16, torch.bfloat16, torch.float32):
+            return False
+    from fla.ops.backends.cute.runtime import is_cute_dsl_available
+
+    return is_cute_dsl_available()
+
+
+@dispatch("common")
 def fused_beta_sigmoid_fwd(x: torch.Tensor, scale: float = 1.0) -> torch.Tensor:
+    if _can_use_cute_beta_sigmoid(x):
+        from fla.ops.backends.cute.gate import fused_beta_sigmoid_fwd_cute
+
+        return fused_beta_sigmoid_fwd_cute(x, scale)
     y = torch.empty_like(x, dtype=torch.float32)
     n_elements = x.numel()
     grid = (triton.cdiv(n_elements, _BETA_SIGMOID_BLOCK_SIZE),)
@@ -70,8 +93,12 @@ def fused_beta_sigmoid_fwd(x: torch.Tensor, scale: float = 1.0) -> torch.Tensor:
     return y
 
 
-@dispatch('common')
+@dispatch("common")
 def fused_beta_sigmoid_bwd(x: torch.Tensor, dy: torch.Tensor, scale: float = 1.0) -> torch.Tensor:
+    if _can_use_cute_beta_sigmoid(x, dy):
+        from fla.ops.backends.cute.gate import fused_beta_sigmoid_bwd_cute
+
+        return fused_beta_sigmoid_bwd_cute(x, dy, scale)
     dx = torch.empty_like(x)
     n_elements = x.numel()
     grid = (triton.cdiv(n_elements, _BETA_SIGMOID_BLOCK_SIZE),)

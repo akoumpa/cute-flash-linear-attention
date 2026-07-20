@@ -16,6 +16,63 @@ from torch.autograd.function import Function, FunctionCtx, once_differentiable
 from fla.ops.utils.op import exp
 from fla.utils import input_guard
 
+_CUTE_DTYPES = (torch.float16, torch.bfloat16, torch.float32)
+
+
+def _can_use_cute_rwkv4_forward(w: Tensor, u: Tensor, k: Tensor, v: Tensor, state: Tensor) -> bool:
+    if (
+        not k.is_cuda
+        or w.dtype != torch.float32
+        or u.dtype not in _CUTE_DTYPES
+        or k.dtype != u.dtype
+        or v.dtype != u.dtype
+        or state.dtype != u.dtype
+        or w.ndim != 1
+        or u.ndim != 1
+        or k.ndim != 3
+        or v.shape != k.shape
+        or k.shape[0] != 1
+        or not 1 <= k.shape[1] <= 16
+        or not 1 <= k.shape[2] <= 8192
+        or w.shape != (k.shape[2],)
+        or u.shape != (k.shape[2],)
+        or state.shape != (1, 3, 1, k.shape[2])
+        or not all(t.device == k.device and t.is_contiguous() for t in (w, u, v, state))
+        or not k.is_contiguous()
+    ):
+        return False
+    from fla.ops.backends.cute.runtime import is_cute_dsl_available
+
+    return is_cute_dsl_available()
+
+
+def _can_use_cute_rwkv4_backward(w, u, k, v, state, grad_wkv, grad_state) -> bool:
+    _, T, C = k.shape
+    if (
+        not k.is_cuda
+        or w.dtype != torch.float32
+        or u.dtype not in _CUTE_DTYPES
+        or k.dtype != u.dtype
+        or v.dtype != u.dtype
+        or state.dtype != u.dtype
+        or w.shape != (C,)
+        or u.shape != (C,)
+        or v.shape != k.shape
+        or k.shape[0] != 1
+        or not 1 <= T <= 16
+        or not 1 <= C <= 8192
+        or state.shape != (1, 3, T + 1, C)
+        or grad_wkv.shape != k.shape
+        or grad_wkv.dtype not in _CUTE_DTYPES
+        or grad_state.shape != (1, 3, 1, C)
+        or grad_state.dtype not in _CUTE_DTYPES
+        or not all(t.device == k.device and t.is_contiguous() for t in (w, u, k, v, state, grad_wkv, grad_state))
+    ):
+        return False
+    from fla.ops.backends.cute.runtime import is_cute_dsl_available
+
+    return is_cute_dsl_available()
+
 
 def get_block_size_c(chans: int) -> int:
     if chans < 32:
@@ -121,6 +178,10 @@ def fused_recurrent_rwkv4_forward(
     state: Tensor,
 ) -> tuple[Tensor, Tensor]:
     (bsz, tsz, chans) = k.shape
+    if _can_use_cute_rwkv4_forward(w, u, k, v, state):
+        from fla.ops.backends.cute.rwkv4 import rwkv4_forward_cute
+
+        return rwkv4_forward_cute(w, u, k, v, state)
 
     # New tensors to output.
     wkvs = k.new_empty(bsz, tsz, chans)
@@ -354,7 +415,7 @@ def fused_recurrent_rwkv4_backward_kernel(
     tl.store(geps_ptr + gstate_s_c * cs, geps, mask=cmask)
 
     # Stores final gradients for w and u.
-    tl.store(gw_ptr + gw_s_b * b_idx + gw_s_c * cs, gw*w, mask=cmask)
+    tl.store(gw_ptr + gw_s_b * b_idx + gw_s_c * cs, gw * w, mask=cmask)
     tl.store(gu_ptr + gu_s_b * b_idx + gu_s_c * cs, gu, mask=cmask)
 
 
@@ -368,6 +429,10 @@ def fused_recurrent_rwkv4_backward(
     grad_state: Tensor,
 ) -> tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
     bsz, tsz, chans = k.shape
+    if _can_use_cute_rwkv4_backward(w, u, k, v, state, grad_wkv, grad_state):
+        from fla.ops.backends.cute.rwkv4 import rwkv4_backward_cute
+
+        return rwkv4_backward_cute(w, u, k, v, state, grad_wkv, grad_state)
 
     gw = w.new_empty(bsz, chans, dtype=torch.float)  # New tensors to output.
     gu = u.new_empty(bsz, chans, dtype=torch.float)
@@ -446,7 +511,6 @@ def fused_recurrent_rwkv4_backward(
 
 
 class FusedRecurrentRWKV4Function(Function):
-
     @staticmethod
     @input_guard
     def forward(
@@ -460,7 +524,7 @@ class FusedRecurrentRWKV4Function(Function):
         ctx.w_dtype = w.dtype
         w = -torch.exp(w.float())
         wkv, state_out = fused_recurrent_rwkv4_forward(w, u, k, v, state)
-        ctx.save_for_backward(w, u, k, v, state_out[:, :, :-1])
+        ctx.save_for_backward(w, u, k, v, state_out)
         return wkv, state_out[:, :, -1:]
 
     @staticmethod

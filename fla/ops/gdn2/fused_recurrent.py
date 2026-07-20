@@ -149,11 +149,7 @@ def fused_recurrent_gdn2_fwd_kernel(
                 i_t = tl.load(num_accepted_tokens + i_n).to(tl.int64) - 1
             else:
                 i_t = 0
-            p_h0 = (
-                h0
-                + tl.load(ssm_state_indices + i_n * stride_indices_seq + i_t).to(tl.int64)
-                * stride_init_state_token
-            )
+            p_h0 = h0 + tl.load(ssm_state_indices + i_n * stride_indices_seq + i_t).to(tl.int64) * stride_init_state_token
             if STATE_V_FIRST:
                 p_h0 = p_h0 + i_hv * K * V + o_v[:, None] * K + o_k[None, :]
             else:
@@ -166,15 +162,15 @@ def fused_recurrent_gdn2_fwd_kernel(
         b_h += tl.load(p_h0, mask=mask_h, other=0).to(tl.float32)
 
     for i_t in tl.range(0, T, num_stages=num_stages):
-        b_q = tl.load(p_q, mask=mask_k, other=0, eviction_policy='evict_last').to(tl.float32)
-        b_k = tl.load(p_k, mask=mask_k, other=0, eviction_policy='evict_last').to(tl.float32)
-        b_v = tl.load(p_v, mask=mask_v, other=0, eviction_policy='evict_first').to(tl.float32)
+        b_q = tl.load(p_q, mask=mask_k, other=0, eviction_policy="evict_last").to(tl.float32)
+        b_k = tl.load(p_k, mask=mask_k, other=0, eviction_policy="evict_last").to(tl.float32)
+        b_v = tl.load(p_v, mask=mask_v, other=0, eviction_policy="evict_first").to(tl.float32)
 
         if USE_QK_L2NORM_IN_KERNEL:
             b_q = b_q / tl.sqrt(tl.sum(b_q * b_q) + 1e-6)
             b_k = b_k / tl.sqrt(tl.sum(b_k * b_k) + 1e-6)
         b_q = b_q * scale
-        b_g = tl.load(p_g, eviction_policy='evict_last').to(tl.float32)
+        b_g = tl.load(p_g, eviction_policy="evict_last").to(tl.float32)
 
         if USE_GATE_IN_KERNEL:
             b_A = tl.load(A_log + i_hv).to(tl.float32)
@@ -196,7 +192,7 @@ def fused_recurrent_gdn2_fwd_kernel(
         else:
             b_h *= exp(b_gk[:, None])
 
-        b_b = tl.load(p_b, mask=mask_k, other=0, eviction_policy='evict_last').to(tl.float32)
+        b_b = tl.load(p_b, mask=mask_k, other=0, eviction_policy="evict_last").to(tl.float32)
         b_bk = b_b * b_k
 
         # erase contribution along V: (b * k)^T S
@@ -205,7 +201,7 @@ def fused_recurrent_gdn2_fwd_kernel(
         else:
             erase_d = tl.sum(b_h * b_bk[:, None], 0)
 
-        b_w = tl.load(p_w, mask=mask_v, other=0, eviction_policy='evict_first').to(tl.float32)
+        b_w = tl.load(p_w, mask=mask_v, other=0, eviction_policy="evict_first").to(tl.float32)
         b_v_new = b_w * b_v - erase_d
 
         if STATE_V_FIRST:
@@ -214,15 +210,11 @@ def fused_recurrent_gdn2_fwd_kernel(
         else:
             b_h += b_k[:, None] * b_v_new[None, :]
             b_o = tl.sum(b_h * b_q[:, None], 0)
-        tl.store(p_o, b_o.to(p_o.dtype.element_ty), mask=mask_v, eviction_policy='evict_first')
+        tl.store(p_o, b_o.to(p_o.dtype.element_ty), mask=mask_v, eviction_policy="evict_first")
 
         if IS_CONTINUOUS_BATCHING:
             if INPLACE_FINAL_STATE:
-                p_ht = (
-                    ht
-                    + tl.load(ssm_state_indices + i_n * stride_indices_seq + i_t).to(tl.int64)
-                    * stride_final_state_token
-                )
+                p_ht = ht + tl.load(ssm_state_indices + i_n * stride_indices_seq + i_t).to(tl.int64) * stride_final_state_token
             else:
                 p_ht = ht + (bos + i_t) * stride_final_state_token
             if STATE_V_FIRST:
@@ -296,6 +288,72 @@ def fused_recurrent_gdn2_fwd(
     else:
         final_state = None
 
+    expected_state_shape = (N, HV, V, K) if state_v_first else (N, HV, K, V)
+    can_use_cute = (
+        cu_seqlens is None
+        and ssm_state_indices is None
+        and num_accepted_tokens is None
+        and not inplace_final_state
+        and not use_qk_l2norm_in_kernel
+        and not use_gate_in_kernel
+        and lower_bound is None
+        and A_log is None
+        and dt_bias is None
+        and B >= 1
+        and T == 1
+        and H >= 2
+        and HV >= H
+        and HV % H == 0
+        and K == 32
+        and V == 32
+        and not state_v_first
+        and B * HV >= 4
+        and q.is_cuda
+        and q.dtype in (torch.float16, torch.bfloat16)
+        and q.dtype == k.dtype == v.dtype
+        and q.shape == k.shape
+        and v.shape == (B, T, HV, V)
+        and g.shape == (B, T, HV, K)
+        and b.shape == g.shape
+        and w.shape == v.shape
+        and q.device == k.device == v.device == g.device == b.device == w.device
+        and q.is_contiguous()
+        and k.is_contiguous()
+        and v.is_contiguous()
+        and g.is_contiguous()
+        and b.is_contiguous()
+        and w.is_contiguous()
+        and g.dtype in (torch.float16, torch.bfloat16, torch.float32)
+        and b.dtype in (torch.float16, torch.bfloat16, torch.float32)
+        and w.dtype in (torch.float16, torch.bfloat16, torch.float32)
+        and out.dtype == v.dtype
+        and out.device == v.device
+        and out.is_contiguous()
+        and B * HV * K * V <= 2**31 - 1
+    )
+    if initial_state is not None and (
+        initial_state.shape != expected_state_shape
+        or initial_state.dtype != torch.float32
+        or initial_state.device != q.device
+        or not initial_state.is_contiguous()
+    ):
+        can_use_cute = False
+    if final_state is not None and (
+        final_state.shape != expected_state_shape
+        or final_state.dtype != torch.float32
+        or final_state.device != q.device
+        or not final_state.is_contiguous()
+    ):
+        can_use_cute = False
+    if can_use_cute:
+        from fla.ops.backends.cute.runtime import is_cute_dsl_available
+
+        can_use_cute = is_cute_dsl_available()
+    if can_use_cute:
+        from fla.ops.backends.cute.gdn2 import gdn2_fwd_cute
+
+        return gdn2_fwd_cute(q, k, v, g, b, w, out, initial_state, final_state, scale, state_v_first)
+
     stride_init_state_token = initial_state.stride(0) if initial_state is not None else 1
     stride_final_state_token = final_state.stride(0) if final_state is not None else 1
 
@@ -306,7 +364,7 @@ def fused_recurrent_gdn2_fwd(
     else:
         stride_indices_seq, stride_indices_tok = ssm_state_indices.stride()
 
-    grid = (triton.cdiv(V, BV) * N * HV, )
+    grid = (triton.cdiv(V, BV) * N * HV,)
     fused_recurrent_gdn2_fwd_kernel[grid](
         q=q,
         k=k,
@@ -407,7 +465,7 @@ def fused_recurrent_gdn2(
         o (torch.Tensor): outputs of shape ``[B, T, HV, V]``.
         final_state (Optional[torch.Tensor]): ``[N, HV, K, V]`` if requested.
     """
-    if 'transpose_state_layout' in kwargs:
+    if "transpose_state_layout" in kwargs:
         if state_v_first:
             raise ValueError("Cannot pass both `state_v_first` and the deprecated `transpose_state_layout`.")
         warnings.warn(
@@ -415,7 +473,7 @@ def fused_recurrent_gdn2(
             DeprecationWarning,
             stacklevel=2,
         )
-        state_v_first = kwargs.pop('transpose_state_layout')
+        state_v_first = kwargs.pop("transpose_state_layout")
 
     if cu_seqlens is not None:
         if q.shape[0] != 1:
@@ -429,13 +487,9 @@ def fused_recurrent_gdn2(
                 f"i.e., {len(cu_seqlens) - 1} rather than {initial_state.shape[0]}."
             )
     assert b.shape == (*q.shape[:3], k.shape[-1]), (
-        f"b must have shape [B, T, HV, K]; got {tuple(b.shape)} "
-        f"vs expected {(*q.shape[:3], k.shape[-1])}."
+        f"b must have shape [B, T, HV, K]; got {tuple(b.shape)} vs expected {(*q.shape[:3], k.shape[-1])}."
     )
-    assert w.shape == v.shape, (
-        f"w must have shape [B, T, HV, V] matching v; got {tuple(w.shape)} "
-        f"vs v {tuple(v.shape)}."
-    )
+    assert w.shape == v.shape, f"w must have shape [B, T, HV, V] matching v; got {tuple(w.shape)} vs v {tuple(v.shape)}."
     if scale is None:
         scale = k.shape[-1] ** -0.5
 

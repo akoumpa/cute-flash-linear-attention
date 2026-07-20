@@ -25,24 +25,75 @@ BKV_LIST = [64, 128] if check_shared_mem() else [32, 64]
 NUM_WARPS = [2, 4] if IS_NVIDIA_HOPPER else [2, 4, 8]
 
 
-@triton.heuristics({
-    'USE_G': lambda args: args['g'] is not None,
-    'USE_G_GAMMA': lambda args: args['g_gamma'] is not None,
-    'USE_INITIAL_STATE': lambda args: args['h0'] is not None,
-    'STORE_FINAL_STATE': lambda args: args['ht'] is not None,
-    'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
-})
+def _can_use_cute_fused_chunk_fwd(
+    q: torch.Tensor,
+    k: torch.Tensor,
+    v: torch.Tensor,
+    g: torch.Tensor | None,
+    g_gamma: torch.Tensor | None,
+    scale: float | None,
+    initial_state: torch.Tensor | None,
+    cu_seqlens: torch.Tensor | None,
+) -> bool:
+    if (
+        g is not None
+        or g_gamma is not None
+        or cu_seqlens is not None
+        or scale is None
+        or not q.is_cuda
+        # The scalar CuTe path wins consistently for FP32, while the existing
+        # tensor-core path remains faster for low-precision inputs.
+        or q.dtype != torch.float32
+        or q.dtype != k.dtype
+        or q.dtype != v.dtype
+        or q.device != k.device
+        or q.device != v.device
+        or q.ndim != 4
+        or k.shape != q.shape
+        or v.ndim != 4
+        or v.shape[:3] != q.shape[:3]
+        or not q.is_contiguous()
+        or not k.is_contiguous()
+        or not v.is_contiguous()
+    ):
+        return False
+    B, T, H, K = q.shape
+    V = v.shape[-1]
+    if B < 1 or T < 1 or H < 1 or K < 1 or V < 1 or T > 16 or K > 64 or V > 64 or T * K > 64:
+        return False
+    if initial_state is not None and (
+        initial_state.shape != (B, H, K, V)
+        or initial_state.dtype != torch.float32
+        or initial_state.device != q.device
+        or not initial_state.is_contiguous()
+    ):
+        return False
+
+    from fla.ops.backends.cute.runtime import is_cute_dsl_available
+
+    return is_cute_dsl_available()
+
+
+@triton.heuristics(
+    {
+        "USE_G": lambda args: args["g"] is not None,
+        "USE_G_GAMMA": lambda args: args["g_gamma"] is not None,
+        "USE_INITIAL_STATE": lambda args: args["h0"] is not None,
+        "STORE_FINAL_STATE": lambda args: args["ht"] is not None,
+        "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
+    }
+)
 @triton.autotune(
     configs=[
-        triton.Config({'BV': BV}, num_warps=num_warps, num_stages=num_stages)
+        triton.Config({"BV": BV}, num_warps=num_warps, num_stages=num_stages)
         for BV in BKV_LIST
         for num_warps in NUM_WARPS
         for num_stages in [2, 3, 4]
     ],
-    key=['H', 'K', 'V', 'BT'],
+    key=["H", "K", "V", "BT"],
     **autotune_cache_kwargs,
 )
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=["T"])
 def fused_chunk_fwd_kernel(
     q,
     k,
@@ -93,22 +144,22 @@ def fused_chunk_fwd_kernel(
     # [BT, BT]
     m_s = o_i[:, None] >= o_i[None, :]
 
-    q = q + (bos*H + i_h) * K
-    k = k + (bos*H + i_h) * K
-    v = v + (bos*H + i_h) * V
-    o = o + (i_k * all + bos).to(tl.int64) * H*V + i_h * V
+    q = q + (bos * H + i_h) * K
+    k = k + (bos * H + i_h) * K
+    v = v + (bos * H + i_h) * V
+    o = o + (i_k * all + bos).to(tl.int64) * H * V + i_h * V
 
     # [BK, BV]
     b_h = tl.zeros([BK, BV], dtype=tl.float32)
     if USE_INITIAL_STATE:
-        p_h = tl.make_block_ptr(h0 + i_nh * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        p_h = tl.make_block_ptr(h0 + i_nh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
         b_h = tl.load(p_h, boundary_check=(0, 1)).to(tl.float32)
 
     for i_t in range(0, NT):
-        p_q = tl.make_block_ptr(q, (T, K), (H*K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
-        p_k = tl.make_block_ptr(k, (K, T), (1, H*K), (i_k * BK, i_t * BT), (BK, BT), (0, 1))
-        p_v = tl.make_block_ptr(v, (T, V), (H*V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
-        p_o = tl.make_block_ptr(o, (T, V), (H*V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+        p_q = tl.make_block_ptr(q, (T, K), (H * K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
+        p_k = tl.make_block_ptr(k, (K, T), (1, H * K), (i_k * BK, i_t * BT), (BK, BT), (0, 1))
+        p_v = tl.make_block_ptr(v, (T, V), (H * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+        p_o = tl.make_block_ptr(o, (T, V), (H * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
 
         o_t = i_t * BT + tl.arange(0, BT)
         m_t = o_t < T
@@ -127,7 +178,7 @@ def fused_chunk_fwd_kernel(
         # scalar decay
         if USE_G:
             p_g = g + (bos + o_t) * H + i_h
-            b_g = tl.load(p_g, mask=(o_t < T), other=0.)
+            b_g = tl.load(p_g, mask=(o_t < T), other=0.0)
             b_g_last = tl.load(g + (bos + last_idx) * H + i_h)
 
             b_gq = exp2(b_g)
@@ -156,27 +207,27 @@ def fused_chunk_fwd_kernel(
         tl.store(p_o, b_o.to(p_o.dtype.element_ty), boundary_check=(0, 1))
 
     if STORE_FINAL_STATE:
-        p_ht = tl.make_block_ptr(ht + i_nh * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        p_ht = tl.make_block_ptr(ht + i_nh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
         tl.store(p_ht, b_h.to(p_ht.dtype.element_ty), boundary_check=(0, 1))
 
 
-@triton.heuristics({
-    'USE_G': lambda args: args['g'] is not None,
-    'USE_G_GAMMA': lambda args: args['g_gamma'] is not None,
-    'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
-    'USE_INITIAL_STATE': lambda args: args['dh0'] is not None,
-    'USE_FINAL_STATE': lambda args: args['dht'] is not None,
-})
+@triton.heuristics(
+    {
+        "USE_G": lambda args: args["g"] is not None,
+        "USE_G_GAMMA": lambda args: args["g_gamma"] is not None,
+        "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
+        "USE_INITIAL_STATE": lambda args: args["dh0"] is not None,
+        "USE_FINAL_STATE": lambda args: args["dht"] is not None,
+    }
+)
 @triton.autotune(
     configs=[
-        triton.Config({}, num_warps=num_warps, num_stages=num_stages)
-        for num_warps in NUM_WARPS
-        for num_stages in [2, 3, 4]
+        triton.Config({}, num_warps=num_warps, num_stages=num_stages) for num_warps in NUM_WARPS for num_stages in [2, 3, 4]
     ],
-    key=['H', 'K', 'V', 'BT'],
+    key=["H", "K", "V", "BT"],
     **autotune_cache_kwargs,
 )
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=["T"])
 def fused_chunk_bwd_kernel(
     q,
     k,
@@ -230,26 +281,26 @@ def fused_chunk_bwd_kernel(
 
     m_s = o_i[:, None] >= o_i[None, :]
 
-    q = q + (bos*H + i_h) * K
-    k = k + (bos*H + i_h) * K
-    v = v + (bos*H + i_h) * V
-    do = do + (bos*H + i_h) * V
-    dq = dq + (i_v * all + bos).to(tl.int64) * H*K + i_h * K
-    dk = dk + (i_v * all + bos).to(tl.int64) * H*K + i_h * K
-    dv = dv + (i_k * all + bos).to(tl.int64) * H*V + i_h * V
+    q = q + (bos * H + i_h) * K
+    k = k + (bos * H + i_h) * K
+    v = v + (bos * H + i_h) * V
+    do = do + (bos * H + i_h) * V
+    dq = dq + (i_v * all + bos).to(tl.int64) * H * K + i_h * K
+    dk = dk + (i_v * all + bos).to(tl.int64) * H * K + i_h * K
+    dv = dv + (i_k * all + bos).to(tl.int64) * H * V + i_h * V
 
     # [BV, BK]
     b_h = tl.zeros([BV, BK], dtype=tl.float32)
     if USE_INITIAL_STATE:
-        p_h = tl.make_block_ptr(h0 + i_nh * K*V, (V, K), (1, V), (i_v * BV, i_k * BK), (BV, BK), (0, 1))
+        p_h = tl.make_block_ptr(h0 + i_nh * K * V, (V, K), (1, V), (i_v * BV, i_k * BK), (BV, BK), (0, 1))
         b_h = tl.load(p_h, boundary_check=(0, 1)).to(tl.float32)
 
     for i_t in range(0, NT):
-        p_q = tl.make_block_ptr(q, (T, K), (H*K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
-        p_k = tl.make_block_ptr(k, (T, K), (H*K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
-        p_v = tl.make_block_ptr(v, (V, T), (1, H*V), (i_v * BV, i_t * BT), (BV, BT), (0, 1))
-        p_do = tl.make_block_ptr(do, (T, V), (H*V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
-        p_dq = tl.make_block_ptr(dq, (T, K), (H*K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
+        p_q = tl.make_block_ptr(q, (T, K), (H * K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
+        p_k = tl.make_block_ptr(k, (T, K), (H * K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
+        p_v = tl.make_block_ptr(v, (V, T), (1, H * V), (i_v * BV, i_t * BT), (BV, BT), (0, 1))
+        p_do = tl.make_block_ptr(do, (T, V), (H * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+        p_dq = tl.make_block_ptr(dq, (T, K), (H * K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
 
         o_t = i_t * BT + tl.arange(0, BT)
         m_t = o_t < T
@@ -267,7 +318,7 @@ def fused_chunk_bwd_kernel(
         # scalar decay
         if USE_G:
             p_g = g + (bos + o_t) * H + i_h
-            b_g = tl.load(p_g, mask=(o_t < T), other=0.)
+            b_g = tl.load(p_g, mask=(o_t < T), other=0.0)
             b_g_last = tl.load(g + (bos + last_idx) * H + i_h)
 
             b_gq = exp2(b_g)
@@ -314,7 +365,7 @@ def fused_chunk_bwd_kernel(
     # [BK, BV]
     b_dh = tl.zeros([BK, BV], dtype=tl.float32)
     if USE_FINAL_STATE:
-        p_dh = tl.make_block_ptr(dht + i_nh * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        p_dh = tl.make_block_ptr(dht + i_nh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
         b_dh += tl.load(p_dh, boundary_check=(0, 1)).to(tl.float32)
 
     if USE_G:
@@ -326,12 +377,12 @@ def fused_chunk_bwd_kernel(
     tl.debug_barrier()
 
     for i_t in range(NT - 1, -1, -1):
-        p_q = tl.make_block_ptr(q, (K, T), (1, H*K), (i_k * BK, i_t * BT), (BK, BT), (0, 1))
-        p_k = tl.make_block_ptr(k, (T, K), (H*K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
-        p_v = tl.make_block_ptr(v, (T, V), (H*V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
-        p_do = tl.make_block_ptr(do, (T, V), (H*V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
-        p_dk = tl.make_block_ptr(dk, (T, K), (H*K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
-        p_dv = tl.make_block_ptr(dv, (T, V), (H*V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+        p_q = tl.make_block_ptr(q, (K, T), (1, H * K), (i_k * BK, i_t * BT), (BK, BT), (0, 1))
+        p_k = tl.make_block_ptr(k, (T, K), (H * K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
+        p_v = tl.make_block_ptr(v, (T, V), (H * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+        p_do = tl.make_block_ptr(do, (T, V), (H * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
+        p_dk = tl.make_block_ptr(dk, (T, K), (H * K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
+        p_dv = tl.make_block_ptr(dv, (T, V), (H * V, 1), (i_t * BT, i_v * BV), (BT, BV), (1, 0))
         # [BK, BT]
         b_q = tl.load(p_q, boundary_check=(0, 1))
         # [BT, BK]
@@ -350,7 +401,7 @@ def fused_chunk_bwd_kernel(
         if USE_G:
             p_g = g + (bos + o_t) * H + i_h
             p_dg = dg + ((i_k * NV + i_v) * all + (bos + o_t)).to(tl.int64) * H + i_h
-            b_g = tl.load(p_g, mask=m_t, other=0.)
+            b_g = tl.load(p_g, mask=m_t, other=0.0)
             b_g_last = tl.load(g + (bos + last_idx) * H + i_h)
 
             b_gq = exp2(b_g)
@@ -365,7 +416,7 @@ def fused_chunk_bwd_kernel(
             b_dk = tl.dot(b_ds.to(b_k.dtype), tl.trans(b_q)) + tl.dot(b_v, tl.trans(b_dh).to(b_v.dtype)) * b_gk[:, None]
 
             # [BT]
-            b_dg_t = tl.where(m_t, tl.load(p_dg, mask=m_t, other=0.) - tl.sum(b_k * b_dk, 1), 0)
+            b_dg_t = tl.where(m_t, tl.load(p_dg, mask=m_t, other=0.0) - tl.sum(b_k * b_dk, 1), 0)
             b_dg_last += tl.sum(b_dg_t, 0)
             b_dg = b_dg_last + b_dg_t - tl.cumsum(b_dg_t, 0)
 
@@ -406,7 +457,7 @@ def fused_chunk_bwd_kernel(
         tl.store(p_dv, b_dv.to(p_dv.dtype.element_ty), boundary_check=(0, 1))
 
     if USE_INITIAL_STATE:
-        p_dh0 = tl.make_block_ptr(dh0 + i_nh * K*V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
+        p_dh0 = tl.make_block_ptr(dh0 + i_nh * K * V, (K, V), (V, 1), (i_k * BK, i_v * BV), (BK, BV), (1, 0))
         tl.store(p_dh0, b_dh.to(p_dh0.dtype.element_ty), boundary_check=(0, 1))
 
 
@@ -423,6 +474,18 @@ def fused_chunk_fwd(
     chunk_size: int = 64,
 ):
     B, T, H, K, V = *q.shape, v.shape[-1]
+    if _can_use_cute_fused_chunk_fwd(q, k, v, g, g_gamma, scale, initial_state, cu_seqlens):
+        from fla.ops.backends.cute.fused_chunk import fused_chunk_fwd_cute
+
+        return fused_chunk_fwd_cute(
+            q=q,
+            k=k,
+            v=v,
+            scale=scale,
+            initial_state=initial_state,
+            output_final_state=output_final_state,
+        )
+
     BT = chunk_size
     BK = min(max(triton.next_power_of_2(K), 16), 64)
     N = B if cu_seqlens is None else len(cu_seqlens) - 1
@@ -430,7 +493,10 @@ def fused_chunk_fwd(
 
     o = v.new_empty(NK, *v.shape, dtype=torch.float) if NK > 1 else torch.empty_like(v)
     ht = k.new_empty(N, H, K, V, dtype=torch.float) if output_final_state else None
-    def grid(meta): return (triton.cdiv(V, meta['BV']), NK, N * H)
+
+    def grid(meta):
+        return (triton.cdiv(V, meta["BV"]), NK, N * H)
+
     fused_chunk_fwd_kernel[grid](
         q=q,
         k=k,
@@ -478,7 +544,7 @@ def fused_chunk_bwd(
     dq = q.new_empty(NV, *q.shape, dtype=torch.float) if NV > 1 else torch.empty_like(q)
     dk = k.new_empty(NV, *k.shape, dtype=torch.float) if NV > 1 else torch.empty_like(k)
     dv = v.new_empty(NK, *v.shape, dtype=torch.float) if NK > 1 else torch.empty_like(v)
-    dg = g.new_empty(NK*NV, *g.shape, dtype=torch.float) if g is not None else None
+    dg = g.new_empty(NK * NV, *g.shape, dtype=torch.float) if g is not None else None
     dh0 = torch.empty_like(initial_state) if initial_state is not None else None
 
     grid = (NV, NK, N * H)
@@ -517,7 +583,6 @@ def fused_chunk_bwd(
 
 
 class FusedChunkFunction(torch.autograd.Function):
-
     @staticmethod
     @input_guard
     @autocast_custom_fwd

@@ -11,12 +11,16 @@ import triton.language as tl
 
 from fla.ops.utils.index import prepare_chunk_offsets
 
+_CUTE_CSR_MAX_SCAN_WORK = 64
 
-@triton.heuristics({
-    'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
-    'USE_BLOCK_COUNTS': lambda args: isinstance(args['block_counts'], torch.Tensor),
-})
-@triton.jit(do_not_specialize=['T', 'N'])
+
+@triton.heuristics(
+    {
+        "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
+        "USE_BLOCK_COUNTS": lambda args: isinstance(args["block_counts"], torch.Tensor),
+    }
+)
+@triton.jit(do_not_specialize=["T", "N"])
 def prepare_block_csr_kernel(
     block_indices,
     block_counts,
@@ -135,6 +139,40 @@ def prepare_block_csr(
             `int32` CSR row offsets of shape `[NB + 1]`, one per block plus a final end offset.
     """
     B, T, H, S = block_indices.shape
+    if (
+        cu_seqlens is None
+        and chunk_indices is None
+        and not torch.compiler.is_compiling()
+        and block_indices.is_cuda
+        and block_indices.is_contiguous()
+        and block_indices.dtype == torch.int64
+        and (isinstance(block_counts, torch.Tensor) or (isinstance(block_counts, int) and 0 <= block_counts <= S))
+        and (
+            not isinstance(block_counts, torch.Tensor)
+            or (
+                block_counts.is_cuda
+                and block_counts.is_contiguous()
+                and block_counts.dtype == torch.int64
+                and block_counts.shape == (B, T, H)
+                and block_counts.device == block_indices.device
+            )
+        )
+        and isinstance(num_blocks, int)
+        and isinstance(block_size, int)
+        and B > 0
+        and T > 0
+        and H > 0
+        and S > 0
+        and num_blocks > 0
+        and block_size > 0
+        and B * H * num_blocks * T * S <= _CUTE_CSR_MAX_SCAN_WORK
+    ):
+        from fla.ops.backends.cute import is_cute_dsl_available
+
+        if is_cute_dsl_available():
+            from fla.ops.backends.cute.csr import prepare_dense_block_csr_cute
+
+            return prepare_dense_block_csr_cute(block_indices, block_counts, num_blocks, block_size)
     N = 0 if cu_seqlens is None else cu_seqlens.numel() - 1
     NB = B * H * num_blocks if cu_seqlens is None else chunk_indices.shape[0] * H
     chunk_offsets = prepare_chunk_offsets(cu_seqlens, block_size) if cu_seqlens is not None else None

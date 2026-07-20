@@ -13,6 +13,7 @@
 
 --------
 
+* [About this fork](#about-this-fork)
 * [News](#news)
 * [Models](#models)
 * [Installation](#installation)
@@ -27,6 +28,25 @@
 * [Citation](#citation)
 * [Star History](#star-history)
 * [Acknowledgements](#acknowledgements)
+
+## About this fork
+
+This fork adds an experimental [NVIDIA CuTe DSL](https://docs.nvidia.com/cutlass/media/docs/pythonDSL/cute_dsl.html) backend to Flash Linear Attention. It keeps the existing public APIs and uses narrowly guarded CuTe routes only where numerical tests and same-hardware benchmarks show that they are safe and faster.
+
+What this fork provides:
+
+- CuTe implementations for selected utility, recurrent, chunked, decode, and native-MMA operator paths.
+- Automatic dispatch on supported Hopper and Blackwell GPUs, with the established Triton, TileLang, or PyTorch implementation retained for unsupported or slower shapes.
+- Forward, backward, state, dtype, layout, and compilation guards designed to preserve existing numerical behavior.
+- A generated [operator inventory](benchmarks/ops/cute_dsl_inventory.json), route-by-route [dispatch evidence](profile/cute-dsl-migration/dispatch.md), and an iteration-level [optimization log](profile/cute-dsl-migration/OPT_LOG.md).
+
+Install the fork with the CuTe dependencies from a source checkout:
+
+```sh
+pip install -e '.[cute]'
+```
+
+Eligible CuTe routes are enabled by default when `nvidia-cutlass-dsl` is installed on a supported GPU. Set `FLA_CUTE_DSL=0` to force the established backends; see [ENVs.md](ENVs.md) for the complete runtime controls. The CuTe backend is currently NVIDIA-specific, while other platforms continue to use their existing implementations.
 
 ## News
 

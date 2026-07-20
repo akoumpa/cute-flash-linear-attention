@@ -22,6 +22,57 @@ from fla.utils import autocast_custom_bwd, autocast_custom_fwd, autotune_cache_k
 BLOCK_K = 64
 
 
+def _can_use_cute_log_linear_attn(q, k, v, g, level_scales, initial_state, output_final_state, cu_seqlens):
+    if (
+        torch.is_grad_enabled()
+        or initial_state is not None
+        or output_final_state
+        or cu_seqlens is not None
+        or not q.is_cuda
+        or q.dtype != torch.float32
+        or q.dtype != k.dtype
+        or q.dtype != v.dtype
+        or q.dtype != level_scales.dtype
+        or g.dtype != torch.float32
+        or q.ndim != 4
+        or k.ndim != 4
+        or v.ndim != 4
+        or g.ndim != 3
+        or level_scales.ndim != 4
+    ):
+        return False
+    B, T, G, K = q.shape
+    H, V = v.shape[2:]
+    minimum_levels = math.ceil(math.log2(T)) + 1 if T > 1 else 1
+    if (
+        B < 1
+        or not 1 <= T <= 16
+        or G != 1
+        or H < 1
+        or B * H < 4
+        or K != 64
+        or V != 64
+        or k.shape != q.shape
+        or v.shape != (B, T, H, V)
+        or g.shape != (B, T, H)
+        or level_scales.shape[:3] != (B, T, H)
+        or level_scales.shape[-1] < minimum_levels
+        or q.device != k.device
+        or q.device != v.device
+        or q.device != g.device
+        or q.device != level_scales.device
+        or not q.is_contiguous()
+        or not k.is_contiguous()
+        or not v.is_contiguous()
+        or not g.is_contiguous()
+        or not level_scales.is_contiguous()
+    ):
+        return False
+    from fla.ops.backends.cute.runtime import is_cute_dsl_available
+
+    return is_cute_dsl_available()
+
+
 @triton.heuristics(
     {
         "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
@@ -1909,6 +1960,11 @@ def chunk_log_linear_attn(
                 f"The batch size is expected to be 1 rather than {q.shape[0]} when using `cu_seqlens`."
                 f"Please flatten variable-length inputs before processing.",
             )
+
+    if _can_use_cute_log_linear_attn(q, k, v, g, level_scales, initial_state, output_final_state, cu_seqlens):
+        from fla.ops.backends.cute.log_linear_attn import log_linear_attn_fwd_cute
+
+        return log_linear_attn_fwd_cute(q, k, v, g, level_scales)
 
     o, final_state = ChunkLogLinearAttentionFunction.apply(
         q,

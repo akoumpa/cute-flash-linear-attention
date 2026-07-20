@@ -31,10 +31,9 @@ class ParallelPATHAttentionFunction(torch.autograd.Function):
     @input_guard
     @autocast_custom_fwd
     def forward(ctx, q, k, v, w, beta, g, scale, cu_seqlens, use_cache=False):
-
         g_cumsum = chunk_global_cumsum(g, cu_seqlens=cu_seqlens, output_dtype=torch.float32) if g is not None else None
-        BS = 64 if check_shared_mem('hopper') else 32
-        BT = 128 if check_shared_mem('ampere') else 64
+        BS = 64 if check_shared_mem("hopper") else 32
+        BT = 128 if check_shared_mem("ampere") else 64
 
         A = chunk_scaled_dot_kkt_fwd(
             k=w,
@@ -88,8 +87,8 @@ class ParallelPATHAttentionFunction(torch.autograd.Function):
     @autocast_custom_bwd
     def backward(ctx, do, dk_new):
         q, k, v, w, g_cumsum, o, beta, L, A = ctx.saved_tensors
-        BT = 128 if check_shared_mem('ampere') else 64
-        BS = 64 if check_shared_mem('hopper') else 32
+        BT = 128 if check_shared_mem("ampere") else 64
+        BS = 64 if check_shared_mem("hopper") else 32
         S = 512
         cu_seqlens = ctx.cu_seqlens
         delta = parallel_attn_bwd_preprocess(o, do)
@@ -208,17 +207,25 @@ class ParallelPATHAttentionFunction(torch.autograd.Function):
         )
         G = q.shape[-2] // k.shape[-2]
         if G > 1:
-            assert dk.dtype == dv.dtype == dw.dtype == dbeta.dtype == torch.float32, 'reduction requires float32'
-            dk = reduce(dk, 'b t (h g) k -> b t h k', g=G, reduction='sum')
-            dv = reduce(dv, 'b t (h g) k -> b t h k', g=G, reduction='sum')
-            dw = reduce(dw, 'b t (h g) k -> b t h k', g=G, reduction='sum')
-            dbeta = reduce(dbeta, 'b t (h g) -> b t h', g=G, reduction='sum')
+            assert dk.dtype == dv.dtype == dw.dtype == dbeta.dtype == torch.float32, "reduction requires float32"
+            dk = reduce(dk, "b t (h g) k -> b t h k", g=G, reduction="sum")
+            dv = reduce(dv, "b t (h g) k -> b t h k", g=G, reduction="sum")
+            dw = reduce(dw, "b t (h g) k -> b t h k", g=G, reduction="sum")
+            dbeta = reduce(dbeta, "b t (h g) -> b t h", g=G, reduction="sum")
         if dg_cumsum is not None:
             dg_cumsum = chunk_global_cumsum(dg_cumsum, cu_seqlens=cu_seqlens, reverse=True)
-        return (dq.to(q.dtype), dk.to(k.dtype), dv.to(v.dtype), dw.to(w.dtype),
-                dbeta.to(beta.dtype),
-                dg_cumsum.to(g_cumsum.dtype) if g_cumsum is not None else None,
-                None, None, None, None)
+        return (
+            dq.to(q.dtype),
+            dk.to(k.dtype),
+            dv.to(v.dtype),
+            dw.to(w.dtype),
+            dbeta.to(beta.dtype),
+            dg_cumsum.to(g_cumsum.dtype) if g_cumsum is not None else None,
+            None,
+            None,
+            None,
+            None,
+        )
 
 
 @torch.compiler.disable
@@ -263,23 +270,57 @@ def parallel_path_attn(
             k_cache of shape `[B, T, H, K]`
     """
     if scale is None:
-        scale = k.shape[-1]**-0.5
+        scale = k.shape[-1] ** -0.5
     if cu_seqlens is not None and q.shape[0] != 1:
         raise ValueError(
             f"The batch size is expected to be 1 rather than {q.shape[0]} when using `cu_seqlens`. "
             f"Please flatten variable-length inputs before processing.",
         )
-    assert w.dtype == beta.dtype == torch.float32, 'w, beta should be float32 to preserve precision.'
+    assert w.dtype == beta.dtype == torch.float32, "w, beta should be float32 to preserve precision."
     if g is not None:
-        assert g.dtype == torch.float32, 'g should be float32 to preserve precision.'
+        assert g.dtype == torch.float32, "g should be float32 to preserve precision."
     assert q.shape[-1] in [16, 32, 64, 128], "only support head_dim in [16, 32, 64, 128] for now. Stay tuned!"
     assert v.shape[-1] in [16, 32, 64, 128], "only support head_dim in [16, 32, 64, 128] for now. Stay tuned!"
-    assert q.shape[-1] == k.shape[-1], 'q, k should have the same head_dim.'
-    assert k.shape == w.shape, 'k, w should have the same shape.'
-    assert beta.shape[:3] == k.shape[:3], 'beta should have the same number of heads as k'
+    assert q.shape[-1] == k.shape[-1], "q, k should have the same head_dim."
+    assert k.shape == w.shape, "k, w should have the same shape."
+    assert beta.shape[:3] == k.shape[:3], "beta should have the same number of heads as k"
     if g is not None:
-        assert g.shape[:3] == q.shape[:3], 'g should have the same number of heads as q'
-    assert q.shape[-2] % k.shape[-2] == 0, 'the number of query heads should be divisible by the number of key heads'
+        assert g.shape[:3] == q.shape[:3], "g should have the same number of heads as q"
+    assert q.shape[-2] % k.shape[-2] == 0, "the number of query heads should be divisible by the number of key heads"
+    B, T, HQ, K = q.shape
+    H, V = k.shape[2], v.shape[-1]
+    can_use_cute = (
+        not torch.is_grad_enabled()
+        and cu_seqlens is None
+        and T == 1
+        and K == 64
+        and V == 64
+        and B * HQ >= 4
+        and q.is_cuda
+        and q.dtype in (torch.float16, torch.bfloat16)
+        and q.dtype == k.dtype == v.dtype
+        and w.dtype == torch.float32
+        and beta.dtype == torch.float32
+        and k.shape == (B, T, H, K)
+        and v.shape == (B, T, H, V)
+        and w.shape == k.shape
+        and beta.shape == (B, T, H)
+        and q.device == k.device == v.device == w.device == beta.device
+        and q.is_contiguous()
+        and k.is_contiguous()
+        and v.is_contiguous()
+        and w.is_contiguous()
+        and beta.is_contiguous()
+        and (g is None or (g.shape == (B, T, HQ) and g.dtype == torch.float32 and g.device == q.device and g.is_contiguous()))
+    )
+    if can_use_cute:
+        from fla.ops.backends.cute.runtime import is_cute_dsl_available
+
+        can_use_cute = is_cute_dsl_available()
+    if can_use_cute:
+        from fla.ops.backends.cute.path_attn import path_attn_fwd_cute
+
+        return path_attn_fwd_cute(q, k, v, w, beta, g, scale, use_cache)
     o, k_cache = ParallelPATHAttentionFunction.apply(q, k, v, w, beta, g, scale, cu_seqlens, use_cache)
     return o, k_cache
 
